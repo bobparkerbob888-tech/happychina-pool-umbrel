@@ -13,8 +13,8 @@ const coins = {
     stratumPort: 3333,
     // Multiple difficulty ports: high diff for ASICs, low diff for small miners
     stratumPorts: [
-      { port: 3333, diff: 100000000, label: 'High Diff (S21/S19 class, 100+ TH/s)' },
-      { port: 3332, diff: 50000,     label: 'Low Diff (small miners, 1-10 TH/s)' }
+      { port: 3333, diff: 500000, label: 'High Diff (S21/S19 class, 100+ TH/s)' },
+      { port: 3332, diff: 1024,   label: 'Low Diff (small miners, 1-10 TH/s)' }
     ],
     reward: 3.125,
     blockTime: 600,
