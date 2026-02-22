@@ -569,6 +569,9 @@ class StratumServer extends EventEmitter {
       minDifficulty: null
     };
 
+    // Store the port starting difficulty as the floor for this client
+    client.portDifficulty = portDifficulty || this.getDefaultDifficulty(coin.algorithm);
+
     this.clients.set(clientId, client);
     console.log(`[Stratum] New connection: ${clientId} for ${coin.name}`);
 
@@ -1253,13 +1256,13 @@ class StratumServer extends EventEmitter {
         newDifficulty = client.minDifficulty;
       }
 
-      // Algorithm-specific difficulty bounds (low enough for small miners on low-diff ports)
-      const bounds = {
-        sha256: { min: 1000, max: 1e15 },
-        scrypt: { min: 64, max: 1e12 }
-      };
-      const b = bounds[client.algorithm] || { min: 1, max: 1e15 };
-      newDifficulty = Math.max(b.min, Math.min(b.max, newDifficulty));
+      // Never go below the port starting difficulty (that's the floor for this port)
+      const portFloor = client.portDifficulty || 1;
+      newDifficulty = Math.max(portFloor, newDifficulty);
+
+      // Algorithm-specific upper bounds
+      const maxBounds = { sha256: 1e15, scrypt: 1e12 };
+      newDifficulty = Math.min(maxBounds[client.algorithm] || 1e15, newDifficulty);
 
       // Round to avoid floating point noise
       newDifficulty = Math.round(newDifficulty * 100) / 100;
