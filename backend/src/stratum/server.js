@@ -1390,8 +1390,11 @@ class StratumServer extends EventEmitter {
   }
 
   getDefaultDifficulty(algorithm) {
+    // Default difficulties sized for modern ASICs:
+    // SHA256: ~200 TH/s per S21 → target 15s/share → diff ≈ 700M per miner
+    // Scrypt: ~9 GH/s per L7 → target 15s/share → diff ≈ 30M per miner
     const defaults = {
-      sha256: 500000,
+      sha256: 500000000,
       scrypt: 65536
     };
     return defaults[algorithm] || 1;
