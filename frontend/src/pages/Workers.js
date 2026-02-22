@@ -27,25 +27,32 @@ function Workers() {
   const totalHashrate = workers.filter(w => w.is_online).reduce((s, w) => s + w.hashrate, 0);
   const bestShare = Math.max(0, ...workers.map(w => w.best_share || 0));
 
-  // Time to find block calculation
-  const getTimeToBlock = () => {
-    if (!poolInfo || !totalHashrate) return 'N/A';
-    // Find the primary coin being mined (first online worker's coin)
-    const onlineWorker = workers.find(w => w.is_online);
-    if (!onlineWorker) return 'N/A';
-    const coinInfo = poolInfo.coins?.[onlineWorker.coin];
+  // Time to find block calculation per coin
+  const formatTTF = (seconds) => {
+    if (!seconds || !isFinite(seconds)) return 'N/A';
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+    if (seconds < 86400 * 365) return `${(seconds / 86400).toFixed(1)}d`;
+    return `${(seconds / (86400 * 365)).toFixed(1)}y`;
+  };
+
+  const getTimeToBlockByCoin = (coinId) => {
+    if (!poolInfo) return 'N/A';
+    const coinWorkers = workers.filter(w => w.coin === coinId && w.is_online);
+    const coinHashrate = coinWorkers.reduce((s, w) => s + w.hashrate, 0);
+    if (!coinHashrate) return 'N/A';
+    const coinInfo = poolInfo.coins?.[coinId];
     if (!coinInfo?.network?.difficulty) return 'N/A';
     const netDiff = coinInfo.network.difficulty;
-    // For scrypt: expected hashes = diff * 2^16; for sha256: diff * 2^32
-    const algo = onlineWorker.algorithm;
+    const algo = coinWorkers[0]?.algorithm;
     const multiplier = algo === 'scrypt' ? Math.pow(2, 16) : Math.pow(2, 32);
-    const expectedSeconds = (netDiff * multiplier) / totalHashrate;
-    if (expectedSeconds < 60) return `${Math.round(expectedSeconds)}s`;
-    if (expectedSeconds < 3600) return `${Math.round(expectedSeconds / 60)}m`;
-    if (expectedSeconds < 86400) return `${(expectedSeconds / 3600).toFixed(1)}h`;
-    if (expectedSeconds < 86400 * 365) return `${(expectedSeconds / 86400).toFixed(1)}d`;
-    return `${(expectedSeconds / (86400 * 365)).toFixed(1)}y`;
+    return formatTTF((netDiff * multiplier) / coinHashrate);
   };
+
+  // Per-coin hashrates
+  const btcHashrate = workers.filter(w => w.coin === 'bitcoin' && w.is_online).reduce((s, w) => s + w.hashrate, 0);
+  const ltcHashrate = workers.filter(w => w.coin === 'litecoin' && w.is_online).reduce((s, w) => s + w.hashrate, 0);
 
   return (
     <div>
@@ -56,20 +63,26 @@ function Workers() {
 
       <div className="stats-grid">
         <div className="stat-card accent">
-          <div className="label">Total Hashrate</div>
-          <div className="value">{formatHashrate(totalHashrate)}</div>
-        </div>
-        <div className="stat-card green">
           <div className="label">Online Workers</div>
           <div className="value">{onlineCount}</div>
         </div>
+        {btcHashrate > 0 && (
+          <div className="stat-card" style={{ borderLeft: '3px solid #f7931a' }}>
+            <div className="label">⛏️ Bitcoin (SHA-256)</div>
+            <div className="value">{formatHashrate(btcHashrate)}</div>
+            <div className="label" style={{ marginTop: 4 }}>TTF Block: <strong>{getTimeToBlockByCoin('bitcoin')}</strong></div>
+          </div>
+        )}
+        {ltcHashrate > 0 && (
+          <div className="stat-card" style={{ borderLeft: '3px solid #bfbbbb' }}>
+            <div className="label">⛏️ Litecoin (Scrypt)</div>
+            <div className="value">{formatHashrate(ltcHashrate)}</div>
+            <div className="label" style={{ marginTop: 4 }}>TTF Block: <strong>{getTimeToBlockByCoin('litecoin')}</strong></div>
+          </div>
+        )}
         <div className="stat-card">
           <div className="label">Best Share</div>
           <div className="value">{formatNumber(bestShare, 0)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="label">Est. Time to Block</div>
-          <div className="value">{getTimeToBlock()}</div>
         </div>
       </div>
 
