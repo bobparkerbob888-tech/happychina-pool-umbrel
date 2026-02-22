@@ -1403,12 +1403,12 @@ class StratumServer extends EventEmitter {
   }
 
   getDefaultDifficulty(algorithm) {
-    // Start low enough for small miners (1 TH/s SHA256, 100 MH/s scrypt)
-    // Vardiff will ramp up quickly for bigger miners
-    // SHA256: 1 TH/s → 15s/share → diff ≈ 3,500
-    // Scrypt: 100 MH/s → 15s/share → diff ≈ 350
+    // SHA256: 500K default → 1 TH/s gets share every ~2s (fast ramp up)
+    //         200 TH/s gets share every ~0.01s (floods briefly, vardiff fixes in 10s)
+    // Scrypt: 512 default → 100 MH/s gets share every ~0.3s (vardiff fixes quickly)
+    // Reconnecting miners restore their saved difficulty from DB immediately
     const defaults = {
-      sha256: 4096,
+      sha256: 500000,
       scrypt: 512
     };
     return defaults[algorithm] || 1;
