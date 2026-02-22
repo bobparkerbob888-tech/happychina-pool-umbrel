@@ -580,7 +580,7 @@ class StratumServer extends EventEmitter {
             const message = JSON.parse(line);
             // Log raw messages from L9 for debugging
             if (!client._logCount) client._logCount = 0;
-            if (client._logCount < 10) {
+            if (client._logCount < 3) {
               client._logCount++;
               console.log(`[RAW-IN] ${clientId}: ${line.substring(0, 200)}`);
             }
@@ -1194,33 +1194,37 @@ class StratumServer extends EventEmitter {
     }
   }
 
-  // Variable difficulty adjustment
+  // Variable difficulty adjustment - bulletproof implementation
   adjustDifficulty(client) {
     const now = Date.now();
     const timeSinceAdjust = (now - client.lastDiffAdjust) / 1000;
 
-    // Only adjust every 30 seconds minimum
-    if (timeSinceAdjust < 10) return;
-    if (client.shareTimestamps.length < 3) return;
+    // Only adjust every 60 seconds minimum to avoid oscillation
+    if (timeSinceAdjust < 60) return;
+    if (client.shareTimestamps.length < 4) return;
 
-    // Calculate average time between shares
+    // Calculate average time between shares using recent window
     const timestamps = client.shareTimestamps;
-    const intervals = [];
-    for (let i = 1; i < timestamps.length; i++) {
-      intervals.push((timestamps[i] - timestamps[i - 1]) / 1000);
-    }
-    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const windowStart = timestamps[0];
+    const windowEnd = timestamps[timestamps.length - 1];
+    const windowDuration = (windowEnd - windowStart) / 1000;
+    const shareCount = timestamps.length - 1;
 
-    // Target: one share every 10 seconds
+    if (windowDuration <= 0 || shareCount <= 0) return;
+
+    const avgInterval = windowDuration / shareCount;
+
+    // Target: one share every 15 seconds
     const targetInterval = 15;
-    // ratio > 1 = shares too fast → increase diff; ratio < 1 = too slow → decrease diff
-    const ratio = avgInterval > 0 ? targetInterval / avgInterval : 4;
+    const ratio = targetInterval / avgInterval;
 
-    // Clamp adjustment between 0.25x and 4x
-    let adjustRatio = Math.max(0.125, Math.min(16, ratio));
+    // Only adjust if significantly off (>50% deviation)
+    if (ratio < 0.5 || ratio > 2.0) {
+      // Smooth adjustment: move only 50% toward target to prevent oscillation
+      let adjustRatio = 1 + (ratio - 1) * 0.5;
+      // Clamp to max 2x change per adjustment
+      adjustRatio = Math.max(0.5, Math.min(2.0, adjustRatio));
 
-    // Only adjust if significantly off (more than 2x either direction)
-    if (adjustRatio < 0.7 || adjustRatio > 1.3) {
       let newDifficulty = client.difficulty * adjustRatio;
 
       // Respect minimum difficulty from mining.configure
@@ -1228,18 +1232,23 @@ class StratumServer extends EventEmitter {
         newDifficulty = client.minDifficulty;
       }
 
-      // Algorithm-specific minimum difficulty floors
-      const minDiffs = { sha256: 500000, scrypt: 256 };
-      const minDiff = minDiffs[client.algorithm] || 1;
-      newDifficulty = Math.max(minDiff, newDifficulty);
-      const maxDiffs = { sha256: 1e15, scrypt: 1e12 };
-      const maxDiff = maxDiffs[client.algorithm] || 1e15;
-      newDifficulty = Math.min(maxDiff, newDifficulty);
+      // Algorithm-specific difficulty bounds
+      const bounds = {
+        sha256: { min: 500000, max: 1e15 },
+        scrypt: { min: 256, max: 1e12 }
+      };
+      const b = bounds[client.algorithm] || { min: 1, max: 1e15 };
+      newDifficulty = Math.max(b.min, Math.min(b.max, newDifficulty));
 
-      if (newDifficulty !== client.difficulty) {
+      // Round to avoid floating point noise
+      newDifficulty = Math.round(newDifficulty * 100) / 100;
+
+      if (Math.abs(newDifficulty - client.difficulty) / client.difficulty > 0.05) {
+        const oldDiff = client.difficulty;
         client.difficulty = newDifficulty;
         client.lastDiffAdjust = now;
-        client.shareTimestamps = [];
+        // Keep last 3 timestamps for continuity instead of clearing
+        client.shareTimestamps = timestamps.slice(-3);
 
         this.sendToClient(client, {
           id: null,
@@ -1247,7 +1256,12 @@ class StratumServer extends EventEmitter {
           params: [client.difficulty]
         });
 
-        console.log(`[Stratum] Vardiff: ${client.id} -> ${client.difficulty.toFixed(4)} (avg interval: ${avgInterval.toFixed(1)}s)`);
+        // Save to DB immediately so reconnects get the right difficulty
+        if (client.workerId) {
+          db.prepare('UPDATE workers SET difficulty = ? WHERE id = ?').run(client.difficulty, client.workerId);
+        }
+
+        console.log(`[Vardiff] ${client.workerName}/${client.coin}: ${oldDiff.toFixed(0)} -> ${newDifficulty.toFixed(0)} (avg ${avgInterval.toFixed(1)}s, ${shareCount} shares in ${windowDuration.toFixed(0)}s)`);
       }
     }
   }
