@@ -11,6 +11,11 @@ const coins = {
     symbol: 'BTC',
     algorithm: 'sha256',
     stratumPort: 3333,
+    // Multiple difficulty ports: high diff for ASICs, low diff for small miners
+    stratumPorts: [
+      { port: 3333, diff: 100000000, label: 'High Diff (S21/S19 class, 100+ TH/s)' },
+      { port: 3332, diff: 50000,     label: 'Low Diff (small miners, 1-10 TH/s)' }
+    ],
     reward: 3.125,
     blockTime: 600,
     confirmations: 100,
@@ -29,6 +34,10 @@ const coins = {
     symbol: 'LTC',
     algorithm: 'scrypt',
     stratumPort: 3334,
+    stratumPorts: [
+      { port: 3334, diff: 2000000, label: 'High Diff (L9/L7 class, 5+ GH/s)' },
+      { port: 3344, diff: 1000,    label: 'Low Diff (small miners, 10-500 MH/s)' }
+    ],
     reward: 6.25,
     blockTime: 150,
     confirmations: 60,

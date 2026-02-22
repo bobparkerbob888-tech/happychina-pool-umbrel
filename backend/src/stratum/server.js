@@ -393,19 +393,25 @@ class StratumServer extends EventEmitter {
   }
 
   startCoinServer(coinId, coin) {
-    const server = net.createServer((socket) => {
-      this.handleConnection(socket, coinId, coin);
-    });
+    // Support multiple difficulty ports per coin
+    const ports = coin.stratumPorts || [{ port: coin.stratumPort, diff: null, label: 'Default' }];
 
-    server.listen(coin.stratumPort, config.stratum.host, () => {
-      console.log(`[Stratum] ${coin.name} (${coin.algorithm}) listening on port ${coin.stratumPort}`);
-    });
+    for (const portConfig of ports) {
+      const server = net.createServer((socket) => {
+        this.handleConnection(socket, coinId, coin, portConfig.diff);
+      });
 
-    server.on('error', (err) => {
-      console.error(`[Stratum] ${coin.name} server error:`, err.message);
-    });
+      server.listen(portConfig.port, config.stratum.host, () => {
+        const diffLabel = portConfig.diff ? ` diff=${portConfig.diff.toLocaleString()}` : '';
+        console.log(`[Stratum] ${coin.name} (${coin.algorithm}) listening on port ${portConfig.port}${diffLabel} - ${portConfig.label || ''}`);
+      });
 
-    this.servers.set(coinId, server);
+      server.on('error', (err) => {
+        console.error(`[Stratum] ${coin.name} port ${portConfig.port} error:`, err.message);
+      });
+
+      this.servers.set(`${coinId}_${portConfig.port}`, server);
+    }
   }
 
   // Poll daemon for new block templates
@@ -538,7 +544,7 @@ class StratumServer extends EventEmitter {
     }
   }
 
-  handleConnection(socket, coinId, coin) {
+  handleConnection(socket, coinId, coin, portDifficulty) {
     const clientId = `${socket.remoteAddress}:${socket.remotePort}`;
     const client = {
       id: clientId,
@@ -550,7 +556,7 @@ class StratumServer extends EventEmitter {
       userId: null,
       workerName: null,
       workerId: null,
-      difficulty: this.getDefaultDifficulty(coin.algorithm),
+      difficulty: portDifficulty || this.getDefaultDifficulty(coin.algorithm),
       extraNonce1: this.getExtraNonce1(),
       shares: { valid: 0, invalid: 0, stale: 0 },
       lastActivity: Date.now(),
@@ -767,6 +773,8 @@ class StratumServer extends EventEmitter {
       if (existing.difficulty && existing.difficulty > client.difficulty) {
         client.difficulty = existing.difficulty;
         this.sendToClient(client, { id: null, method: 'mining.set_difficulty', params: [client.difficulty] });
+        // CRITICAL: Resend job after difficulty change so miner mines at correct difficulty
+        this.sendJob(client, false);
         console.log(`[Stratum] Restored difficulty ${client.difficulty.toFixed(2)} for ${client.workerName} on ${client.coin}`);
       }
     } else {
@@ -1245,10 +1253,10 @@ class StratumServer extends EventEmitter {
         newDifficulty = client.minDifficulty;
       }
 
-      // Algorithm-specific difficulty bounds
+      // Algorithm-specific difficulty bounds (low enough for small miners on low-diff ports)
       const bounds = {
-        sha256: { min: 500000, max: 1e15 },
-        scrypt: { min: 256, max: 1e12 }
+        sha256: { min: 1000, max: 1e15 },
+        scrypt: { min: 64, max: 1e12 }
       };
       const b = bounds[client.algorithm] || { min: 1, max: 1e15 };
       newDifficulty = Math.max(b.min, Math.min(b.max, newDifficulty));
@@ -1403,13 +1411,11 @@ class StratumServer extends EventEmitter {
   }
 
   getDefaultDifficulty(algorithm) {
-    // SHA256: 500K default → 1 TH/s gets share every ~2s (fast ramp up)
-    //         200 TH/s gets share every ~0.01s (floods briefly, vardiff fixes in 10s)
-    // Scrypt: 512 default → 100 MH/s gets share every ~0.3s (vardiff fixes quickly)
-    // Reconnecting miners restore their saved difficulty from DB immediately
+    // Fallback only - used when coin has no stratumPorts config
+    // Port-specific difficulty from coins.js takes priority
     const defaults = {
-      sha256: 500000,
-      scrypt: 512
+      sha256: 100000000,  // 100M - for S21 class (200 TH/s)
+      scrypt: 2000000     // 2M - for L9 class (16 GH/s)
     };
     return defaults[algorithm] || 1;
   }
