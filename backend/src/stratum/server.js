@@ -1015,23 +1015,33 @@ class StratumServer extends EventEmitter {
 
   handleDisconnect(client) {
     console.log(`[Stratum] Disconnected: ${client.id}`);
-
     this.clients.delete(client.id);
 
     if (client.workerId) {
-      // Only set offline if no other active client is using this worker
-      let stillOnline = false;
-      for (const [, c] of this.clients) {
-        if (c.workerId === client.workerId && c.authorized) {
-          stillOnline = true;
-          break;
+      const workerId = client.workerId;
+      // Delay offline check by 15s to handle rapid reconnect cycles
+      setTimeout(() => {
+        // Check if another client has taken over this worker
+        let stillOnline = false;
+        for (const [, c] of this.clients) {
+          if (c.workerId === workerId && c.authorized) {
+            stillOnline = true;
+            break;
+          }
         }
-      }
-      if (!stillOnline) {
-        db.prepare(
-          'UPDATE workers SET is_online = 0, disconnected_at = CURRENT_TIMESTAMP WHERE id = ?'
-        ).run(client.workerId);
-      }
+        if (!stillOnline) {
+          // Also check if worker was recently connected (within 30s) - if so, it's likely reconnecting
+          const worker = db.prepare('SELECT connected_at FROM workers WHERE id = ?').get(workerId);
+          if (worker && worker.connected_at) {
+            const connectedAge = (Date.now() - new Date(worker.connected_at + 'Z').getTime()) / 1000;
+            if (connectedAge < 30) {
+              // Recently connected, probably just reconnecting - don't mark offline yet
+              return;
+            }
+          }
+          db.prepare('UPDATE workers SET is_online = 0, disconnected_at = CURRENT_TIMESTAMP WHERE id = ?').run(workerId);
+        }
+      }, 15000);
     }
   }
 
