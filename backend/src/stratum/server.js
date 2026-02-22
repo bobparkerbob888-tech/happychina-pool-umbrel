@@ -706,8 +706,8 @@ class StratumServer extends EventEmitter {
 
     // Look up user by username or wallet address
     const user = db.prepare(
-      'SELECT id, username FROM users WHERE username = ? OR wallet_address = ?'
-    ).get(username, username);
+      'SELECT id, username FROM users WHERE username = ? OR wallet_address = ? OR INSTR(wallet_address, ?) > 0'
+    ).get(username, username, username);
 
     if (!user) {
       // Auto-register with wallet address if it looks like one
@@ -752,6 +752,7 @@ class StratumServer extends EventEmitter {
   }
 
   registerWorker(client) {
+    console.log('[Stratum] registerWorker:', client.userId, client.workerName, client.coin, 'remoteAddr:', client.socket?.remoteAddress);
     const existing = db.prepare(
       'SELECT id, difficulty FROM workers WHERE user_id = ? AND name = ? AND coin = ?'
     ).get(client.userId, client.workerName, client.coin);
