@@ -1198,10 +1198,16 @@ class StratumServer extends EventEmitter {
   adjustDifficulty(client) {
     const now = Date.now();
     const timeSinceAdjust = (now - client.lastDiffAdjust) / 1000;
+    const connectionAge = (now - client.lastActivity + 1) / 1000; // rough proxy
 
-    // Only adjust every 60 seconds minimum to avoid oscillation
-    if (timeSinceAdjust < 60) return;
-    if (client.shareTimestamps.length < 4) return;
+    // Fast ramp: first 5 minutes, adjust every 10s with up to 16x jumps
+    // Steady state: after 5 min, adjust every 60s with max 2x changes
+    const isFastRamp = client.shares.valid < 50;
+    const minInterval = isFastRamp ? 10 : 60;
+    const minShares = isFastRamp ? 3 : 4;
+
+    if (timeSinceAdjust < minInterval) return;
+    if (client.shareTimestamps.length < minShares) return;
 
     // Calculate average time between shares using recent window
     const timestamps = client.shareTimestamps;
@@ -1218,12 +1224,19 @@ class StratumServer extends EventEmitter {
     const targetInterval = 15;
     const ratio = targetInterval / avgInterval;
 
-    // Only adjust if significantly off (>50% deviation)
-    if (ratio < 0.5 || ratio > 2.0) {
-      // Smooth adjustment: move only 50% toward target to prevent oscillation
-      let adjustRatio = 1 + (ratio - 1) * 0.5;
-      // Clamp to max 2x change per adjustment
-      adjustRatio = Math.max(0.5, Math.min(2.0, adjustRatio));
+    // Fast ramp: allow aggressive jumps; Steady: require >50% deviation
+    const threshold = isFastRamp ? 1.5 : 2.0;
+    if (ratio < (1/threshold) || ratio > threshold) {
+      // Fast ramp: jump directly to target; Steady: move 50% toward target
+      let adjustRatio;
+      if (isFastRamp) {
+        // Direct jump to target ratio, clamped to 16x
+        adjustRatio = Math.max(0.0625, Math.min(16, ratio));
+      } else {
+        // Smooth: move 50% toward target, max 2x
+        adjustRatio = 1 + (ratio - 1) * 0.5;
+        adjustRatio = Math.max(0.5, Math.min(2.0, adjustRatio));
+      }
 
       let newDifficulty = client.difficulty * adjustRatio;
 
@@ -1390,12 +1403,13 @@ class StratumServer extends EventEmitter {
   }
 
   getDefaultDifficulty(algorithm) {
-    // Default difficulties sized for modern ASICs:
-    // SHA256: ~200 TH/s per S21 → target 15s/share → diff ≈ 700M per miner
-    // Scrypt: ~9 GH/s per L7 → target 15s/share → diff ≈ 30M per miner
+    // Start low enough for small miners (1 TH/s SHA256, 100 MH/s scrypt)
+    // Vardiff will ramp up quickly for bigger miners
+    // SHA256: 1 TH/s → 15s/share → diff ≈ 3,500
+    // Scrypt: 100 MH/s → 15s/share → diff ≈ 350
     const defaults = {
-      sha256: 500000000,
-      scrypt: 65536
+      sha256: 4096,
+      scrypt: 512
     };
     return defaults[algorithm] || 1;
   }
