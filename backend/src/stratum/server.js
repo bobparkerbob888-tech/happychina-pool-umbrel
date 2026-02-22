@@ -1218,7 +1218,7 @@ class StratumServer extends EventEmitter {
       }
 
       // Algorithm-specific minimum difficulty floors
-      const minDiffs = { sha256: 64, scrypt: 256 };
+      const minDiffs = { sha256: 500000, scrypt: 256 };
       const minDiff = minDiffs[client.algorithm] || 1;
       newDifficulty = Math.max(minDiff, newDifficulty);
       const maxDiffs = { sha256: 1e15, scrypt: 1e12 };
@@ -1366,7 +1366,7 @@ class StratumServer extends EventEmitter {
 
   getDefaultDifficulty(algorithm) {
     const defaults = {
-      sha256: 64,
+      sha256: 500000,
       scrypt: 65536
     };
     return defaults[algorithm] || 1;
