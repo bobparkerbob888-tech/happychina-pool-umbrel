@@ -772,8 +772,10 @@ class StratumServer extends EventEmitter {
       ).run(client.socket.remoteAddress, client.algorithm, existing.id);
       client.workerId = existing.id;
 
-      // Restore difficulty from previous session to avoid resetting to default on reconnect
-      if (existing.difficulty && existing.difficulty > client.difficulty) {
+      // Restore difficulty from previous session, but cap at 16x the starting difficulty
+      // to avoid restoring an old high difficulty that causes reconnect loops
+      const maxRestoreDiff = client.difficulty * 16;
+      if (existing.difficulty && existing.difficulty > client.difficulty && existing.difficulty <= maxRestoreDiff) {
         client.difficulty = existing.difficulty;
         this.sendToClient(client, { id: null, method: 'mining.set_difficulty', params: [client.difficulty] });
         // CRITICAL: Resend job after difficulty change so miner mines at correct difficulty
