@@ -1256,8 +1256,8 @@ class StratumServer extends EventEmitter {
         newDifficulty = client.minDifficulty;
       }
 
-      // Never go below the port starting difficulty (that's the floor for this port)
-      const portFloor = client.portDifficulty || 1;
+      // Minimum difficulty floor (algorithm-specific, not port-locked so vardiff can go lower)
+      const portFloor = 1;
       newDifficulty = Math.max(portFloor, newDifficulty);
 
       // Algorithm-specific upper bounds
@@ -1417,8 +1417,8 @@ class StratumServer extends EventEmitter {
     // Fallback only - used when coin has no stratumPorts config
     // Port-specific difficulty from coins.js takes priority
     const defaults = {
-      sha256: 100000000,  // 100M - for S21 class (200 TH/s)
-      scrypt: 2000000     // 2M - for L9 class (16 GH/s)
+      sha256: 65536,   // 64K - low start, vardiff ramps up quickly for any miner
+      scrypt: 65536    // 64K - low start, vardiff ramps up quickly for any miner
     };
     return defaults[algorithm] || 1;
   }

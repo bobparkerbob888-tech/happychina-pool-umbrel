@@ -9,6 +9,11 @@ const coins = {
     symbol: 'BTC',
     algorithm: 'sha256',
     stratumPort: 3342,
+    // Multiple difficulty ports - vardiff ramps up from starting diff
+    stratumPorts: [
+      { port: 3342, diff: 65536,  label: 'Auto-diff (all SHA256 miners, vardiff)' },
+      { port: 3332, diff: 512,    label: 'Low Diff (CPU/GPU miners)' }
+    ],
     reward: 3.125,
     blockTime: 600,
     confirmations: 100,
@@ -47,6 +52,11 @@ const coins = {
     symbol: 'LTC',
     algorithm: 'scrypt',
     stratumPort: 3333,
+    // Multiple difficulty ports - vardiff ramps up from starting diff
+    stratumPorts: [
+      { port: 3333, diff: 65536,  label: 'Auto-diff (all Scrypt miners, vardiff)' },
+      { port: 3344, diff: 512,    label: 'Low Diff (CPU/GPU miners)' }
+    ],
     reward: 6.25,
     blockTime: 150,
     confirmations: 60,

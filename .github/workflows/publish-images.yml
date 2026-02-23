@@ -28,7 +28,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/happychina-pool-backend
           tags: |
             type=raw,value=latest
-            type=raw,value=2.0.0
+            type=raw,value=2.1.0
       - uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -51,7 +51,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/happychina-pool-frontend
           tags: |
             type=raw,value=latest
-            type=raw,value=2.0.0
+            type=raw,value=2.1.0
       - uses: docker/build-push-action@v5
         with:
           context: ./frontend

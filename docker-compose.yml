@@ -12,7 +12,7 @@ services:
 
   # === Backend API (Node.js + SQLite) ===
   backend:
-    image: ghcr.io/bobparkerbob888-tech/happychina-pool-backend:2.0.0
+    image: ghcr.io/bobparkerbob888-tech/happychina-pool-backend:2.1.0
     restart: on-failure
     environment:
       PORT: '8080'
@@ -70,7 +70,7 @@ services:
       - ${APP_DATA_DIR:-.}/frontend/build:/frontend/build:ro
     ports:
       - '8080:8080'
-      - '3333-3343:3333-3343'
+      - '3332-3344:3332-3344'
     expose:
       - '8080'
 
@@ -88,7 +88,7 @@ services:
 
   # === Frontend (React + Nginx) ===
   frontend:
-    image: ghcr.io/bobparkerbob888-tech/happychina-pool-frontend:2.0.0
+    image: ghcr.io/bobparkerbob888-tech/happychina-pool-frontend:2.1.0
     restart: on-failure
     depends_on:
       - backend
