@@ -161,6 +161,11 @@ This pool runs 11 blockchain daemons. Full sync requires approximately:
 
 **Total: ~1.75TB**
 
+## Other Versions
+
+- **Ubuntu/Linux**: [happychina-pool-ubuntu](https://github.com/bobparkerbob888-tech/happychina-pool-ubuntu) — one-command CLI install
+- **Windows**: [happychina-pool-windows](https://github.com/bobparkerbob888-tech/happychina-pool-windows) — one-click `.bat` launcher
+
 ## Production Notes
 
 - Set a strong `JWT_SECRET` in `.env`
