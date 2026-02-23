@@ -74,6 +74,18 @@ services:
     expose:
       - '8080'
 
+  # === Init: fix data directory permissions ===
+  init:
+    image: alpine:3.19
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        chmod -R 777 /data/bitcoin /data/namecoin 2>/dev/null || true
+        echo "Permissions fixed."
+    volumes:
+      - ${APP_DATA_DIR:-.}/data/bitcoin:/data/bitcoin
+      - ${APP_DATA_DIR:-.}/data/namecoin:/data/namecoin
+
   # === Frontend (React + Nginx) ===
   frontend:
     image: ghcr.io/bobparkerbob888-tech/happychina-pool-frontend:2.0.0
