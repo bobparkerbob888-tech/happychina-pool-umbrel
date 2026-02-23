@@ -1,12 +1,13 @@
-# Mining Pool
+# HappyChina Mining Pool
 
-A full-featured multi-coin cryptocurrency mining pool with web dashboard.
+A full-featured multi-coin cryptocurrency mining pool with web dashboard, designed for Umbrel.
 
 ## Features
 
 - **Multi-algorithm support**: SHA-256, Scrypt
-- **12 coins**: Bitcoin, Litecoin, Dogecoin, Namecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW, eGulden
-- **Stratum server**: One port per coin, handles mining connections with real PoW validation
+- **11 coins**: Bitcoin, Namecoin, Litecoin, Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW
+- **Merge mining**: Namecoin merge-mined with Bitcoin (SHA-256); Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW merge-mined with Litecoin (Scrypt)
+- **Two stratum ports**: SHA-256 miners connect to one port, Scrypt miners to another — all merge-mined coins are found automatically
 - **PPLNS rewards**: Pay Per Last N Shares payment system
 - **Automatic payouts**: Hourly payment processing
 - **Web dashboard**: Real-time hashrate charts, worker management, payment history
@@ -18,7 +19,24 @@ A full-featured multi-coin cryptocurrency mining pool with web dashboard.
 - **Variable difficulty**: Automatic per-client difficulty adjustment
 - **mining.configure**: Version rolling support for ASICs (BIP320)
 
-## Quick Start
+## Stratum Ports
+
+| Port | Algorithm | Primary Coin | Merge-Mined Coins |
+|------|-----------|-------------|-------------------|
+| 3342 | SHA-256   | Bitcoin (BTC) | Namecoin (NMC) |
+| 3333 | Scrypt    | Litecoin (LTC) | DOGE, PEPE, BELLS, LKY, JKC, DINGO, SHIC, TRMP |
+
+Connect your miners:
+- **SHA-256 ASICs**: `stratum+tcp://YOUR_UMBREL_IP:3342`
+- **Scrypt ASICs**: `stratum+tcp://YOUR_UMBREL_IP:3333`
+
+Use your wallet address as the username.
+
+## Quick Start (Umbrel)
+
+Install from the Umbrel app store or add the community app store repo.
+
+## Quick Start (Standalone)
 
 ### Prerequisites
 
@@ -45,22 +63,21 @@ Backend runs on http://localhost:8080, frontend on http://localhost:3000.
 ### Docker Deployment
 
 ```bash
-cp backend/.env.example backend/.env  # Edit with your settings
 docker-compose up -d
 ```
 
-Frontend: http://localhost:3000, API: http://localhost:8080
+Frontend: http://localhost:80, API: http://localhost:8080
 
 ## Architecture
 
 ```
-mining-pool/
+happychina-pool/
 ├── backend/
 │   └── src/
 │       ├── index.js              # Main entry, Express + cron jobs
 │       ├── config/
 │       │   ├── index.js          # Server configuration
-│       │   └── coins.js          # Coin definitions (algo, ports, daemons)
+│       │   └── coins.js          # Coin definitions (algo, daemons, merge-mining)
 │       ├── api/routes/
 │       │   ├── auth.js           # Register, login, profile
 │       │   ├── pool.js           # Pool stats, blocks, coins, daemon status
@@ -71,7 +88,7 @@ mining-pool/
 │       ├── models/
 │       │   └── database.js       # SQLite schema + connection
 │       ├── stratum/
-│       │   └── server.js         # Stratum protocol server (multi-port)
+│       │   └── server.js         # Stratum protocol server (multi-algo)
 │       └── services/
 │           ├── shareProcessor.js  # PPLNS reward calculation
 │           ├── paymentProcessor.js # Automatic payments
@@ -86,25 +103,30 @@ mining-pool/
 │       ├── hooks/useAuth.js      # Auth context
 │       └── utils/format.js       # Formatters (hashrate, dates, etc.)
 ├── docker-compose.yml
+├── umbrel-app.yml
 └── README.md
 ```
 
-## Stratum Ports
+## Supported Coins
 
-| Coin             | Symbol | Algorithm | Port |
-|-----------------|--------|-----------|------|
-| Bitcoin         | BTC    | SHA-256   | 3333 |
-| Litecoin        | LTC    | Scrypt    | 3334 |
-| Dogecoin        | DOGE   | Scrypt    | 3335 |
-| Namecoin        | NMC    | SHA-256   | 3336 |
-| Pepecoin        | PEPE   | SHA-256   | 3337 |
-| Bells           | BELLS  | Scrypt    | 3338 |
-| Luckycoin       | LKY    | Scrypt    | 3339 |
-| Junkcoin        | JKC    | Scrypt    | 3340 |
-| Dingocoin       | DINGO  | Scrypt    | 3341 |
-| Shibacoin       | SHIC   | Scrypt    | 3342 |
-| TrumPOW         | TRMP   | Scrypt    | 3343 |
-| eGulden         | EFL    | Scrypt    | 3344 |
+### SHA-256 (port 3342)
+| Coin | Symbol | Type | Block Time |
+|------|--------|------|-----------|
+| Bitcoin | BTC | Primary | 10 min |
+| Namecoin | NMC | Merge-mined with BTC | 10 min |
+
+### Scrypt (port 3333)
+| Coin | Symbol | Type | Block Time |
+|------|--------|------|-----------|
+| Litecoin | LTC | Primary | 2.5 min |
+| Dogecoin | DOGE | Merge-mined with LTC | 1 min |
+| Pepecoin | PEPE | Merge-mined with LTC | 1 min |
+| Bells | BELLS | Merge-mined with LTC | 1 min |
+| Luckycoin | LKY | Merge-mined with LTC | 1 min |
+| Junkcoin | JKC | Merge-mined with LTC | 1 min |
+| Dingocoin | DINGO | Merge-mined with LTC | 1 min |
+| Shibacoin | SHIC | Merge-mined with LTC | 1 min |
+| TrumPOW | TRMP | Merge-mined with LTC | 1 min |
 
 ## API Endpoints
 
@@ -128,15 +150,16 @@ mining-pool/
 - `GET /api/miner/balances` - Current balances
 - `GET /api/miner/earnings` - Earnings estimates
 
-## Adding a New Coin
+## Disk Space Requirements
 
-Edit `backend/src/config/coins.js` and add a new entry with:
-- Algorithm, stratum port, block reward, block time
-- Daemon RPC connection details
-- Confirmation count
-- Address prefixes for auto-registration
+This pool runs 11 blockchain daemons. Full sync requires approximately:
+- Bitcoin: ~850GB
+- Litecoin: ~250GB
+- Bells: ~400GB
+- Dogecoin: ~220GB
+- Other coins: ~30GB total
 
-The stratum server automatically starts a listener for each configured coin.
+**Total: ~1.75TB**
 
 ## Production Notes
 
