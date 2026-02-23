@@ -1,0 +1,97 @@
+name: Publish Docker Images
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/happychina-pool-backend
+          tags: |
+            type=raw,value=latest
+            type=raw,value=2.0.0
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/happychina-pool-frontend
+          tags: |
+            type=raw,value=latest
+            type=raw,value=2.0.0
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  push-daemon-images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: bellscoin
+            tag: "3.0"
+            asset: bellscoin-3.0.tar.gz
+          - name: dingocoin
+            tag: v1.18.0.0
+            asset: dingocoin-v1.18.0.0.tar.gz
+          - name: shibacoin
+            tag: "1.2.1"
+            asset: shibacoin-1.2.1.tar.gz
+          - name: trumpow
+            tag: "1.0"
+            asset: trumpow-1.0.tar.gz
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download image tar from release
+        run: |
+          curl -sL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://github.com/${{ github.repository }}/releases/latest/download/${{ matrix.asset }}" \
+            -o /tmp/${{ matrix.asset }}
+          ls -lh /tmp/${{ matrix.asset }}
+      - name: Load, tag and push
+        run: |
+          gunzip -c /tmp/${{ matrix.asset }} | docker load
+          docker tag ${{ matrix.name }}:${{ matrix.tag }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.tag }}
+          docker tag ${{ matrix.name }}:${{ matrix.tag }} ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:latest
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.tag }}
+          docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}:latest

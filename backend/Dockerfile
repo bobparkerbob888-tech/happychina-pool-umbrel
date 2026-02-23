@@ -15,3 +15,5 @@ EXPOSE 8080
 EXPOSE 3333-3344
 
 CMD ["node", "src/index.js"]
+
+LABEL org.opencontainers.image.source=https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
