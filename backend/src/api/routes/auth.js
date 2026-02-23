@@ -8,8 +8,46 @@ const { authMiddleware } = require('../../middleware/auth');
 
 const router = express.Router();
 
+// Simple in-memory rate limiter for auth endpoints
+const loginAttempts = new Map();
+const registerAttempts = new Map();
+
+function rateLimit(store, maxAttempts, windowMs) {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const now = Date.now();
+    const record = store.get(ip);
+    if (record) {
+      // Clean old entries
+      if (now - record.firstAttempt > windowMs) {
+        store.set(ip, { count: 1, firstAttempt: now });
+        return next();
+      }
+      if (record.count >= maxAttempts) {
+        const retryAfter = Math.ceil((record.firstAttempt + windowMs - now) / 1000);
+        return res.status(429).json({ error: 'Too many attempts. Try again in ' + retryAfter + ' seconds.' });
+      }
+      record.count++;
+    } else {
+      store.set(ip, { count: 1, firstAttempt: now });
+    }
+    // Cleanup old entries periodically
+    if (store.size > 10000) {
+      for (const [key, val] of store) {
+        if (now - val.firstAttempt > windowMs) store.delete(key);
+      }
+    }
+    next();
+  };
+}
+
+// 5 login attempts per 15 minutes per IP
+const loginLimiter = rateLimit(loginAttempts, 5, 15 * 60 * 1000);
+// 3 register attempts per hour per IP
+const registerLimiter = rateLimit(registerAttempts, 3, 60 * 60 * 1000);
+
 // Register
-router.post('/register', (req, res) => {
+router.post('/register', registerLimiter, (req, res) => {
   try {
     const { username, email, password, wallet_address } = req.body;
 
@@ -37,19 +75,24 @@ router.post('/register', (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 10);
     const apiKey = uuidv4();
 
+    // First registered user automatically becomes admin
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+    const isAdmin = userCount === 0 ? 1 : 0;
+
     const result = db.prepare(
-      'INSERT INTO users (username, email, password, wallet_address, api_key) VALUES (?, ?, ?, ?, ?)'
-    ).run(username, email, hashedPassword, wallet_address || '', apiKey);
+      'INSERT INTO users (username, email, password, wallet_address, api_key, is_admin) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(username, email, hashedPassword, wallet_address || '', apiKey, isAdmin);
 
     const token = jwt.sign({ userId: result.lastInsertRowid }, config.jwtSecret, { expiresIn: '7d' });
 
     res.status(201).json({
-      message: 'Registration successful',
+      message: isAdmin ? 'Registration successful - you are the admin!' : 'Registration successful',
       token,
       user: {
         id: result.lastInsertRowid,
         username,
         email,
+        is_admin: isAdmin,
         api_key: apiKey
       }
     });
@@ -60,7 +103,7 @@ router.post('/register', (req, res) => {
 });
 
 // Login
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -175,11 +218,9 @@ router.put('/addresses', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'addresses object required' });
   }
 
-  const upsert = db.prepare(`
-    INSERT INTO user_addresses (user_id, coin, address, updated_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(user_id, coin) DO UPDATE SET address = excluded.address, updated_at = CURRENT_TIMESTAMP
-  `);
+  const upsert = db.prepare(
+    'INSERT INTO user_addresses (user_id, coin, address, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id, coin) DO UPDATE SET address = excluded.address, updated_at = CURRENT_TIMESTAMP'
+  );
 
   const remove = db.prepare('DELETE FROM user_addresses WHERE user_id = ? AND coin = ?');
 
