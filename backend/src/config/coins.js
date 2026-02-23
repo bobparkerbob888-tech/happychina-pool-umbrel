@@ -1,21 +1,14 @@
 /**
- * Coin configurations.
+ * Coin configurations - Multi-Algorithm Pool (SHA-256 + Scrypt)
  * Each coin specifies its algorithm, daemon RPC settings, stratum port, and reward info.
  * Daemon credentials are loaded from environment variables (.env file).
- * To add a coin: copy an existing entry, set the env var prefix (e.g., MYCOIN_RPC_*), and add to .env
- * To remove a coin: delete or comment out its entry below and from .env
  */
 const coins = {
   bitcoin: {
     name: 'Bitcoin',
     symbol: 'BTC',
     algorithm: 'sha256',
-    stratumPort: 3333,
-    // Multiple difficulty ports: high diff for ASICs, low diff for small miners
-    stratumPorts: [
-      { port: 3333, diff: 500000, label: 'High Diff (S21/S19 class, 100+ TH/s)' },
-      { port: 3332, diff: 1024,   label: 'Low Diff (small miners, 1-10 TH/s)' }
-    ],
+    stratumPort: 3342,
     reward: 3.125,
     blockTime: 600,
     confirmations: 100,
@@ -29,15 +22,31 @@ const coins = {
     explorer: 'https://blockchair.com/bitcoin/transaction/',
     addressPrefixes: ['1', '3', 'bc1']
   },
+  namecoin: {
+    name: 'Namecoin',
+    symbol: 'NMC',
+    algorithm: 'sha256',
+    stratumPort: 3343,
+    reward: 6.25,
+    blockTime: 600,
+    confirmations: 100,
+    mergeMinedWith: 'bitcoin',
+    chainId: 1,
+    auxpowApi: 'createauxblock',
+    daemon: {
+      host: process.env.NMC_RPC_HOST || '127.0.0.1',
+      port: parseInt(process.env.NMC_RPC_PORT) || 8336,
+      user: process.env.NMC_RPC_USER || 'rpcuser',
+      pass: process.env.NMC_RPC_PASS || 'rpcuser'
+    },
+    explorer: 'https://namecoin.info/tx/',
+    addressPrefixes: ['N', 'M']
+  },
   litecoin: {
     name: 'Litecoin',
     symbol: 'LTC',
     algorithm: 'scrypt',
-    stratumPort: 3334,
-    stratumPorts: [
-      { port: 3334, diff: 2000000, label: 'High Diff (L9/L7 class, 5+ GH/s)' },
-      { port: 3344, diff: 1000,    label: 'Low Diff (small miners, 10-500 MH/s)' }
-    ],
+    stratumPort: 3333,
     reward: 6.25,
     blockTime: 150,
     confirmations: 60,
@@ -56,7 +65,7 @@ const coins = {
     name: 'Dogecoin',
     symbol: 'DOGE',
     algorithm: 'scrypt',
-    stratumPort: 3335,
+    stratumPort: 3334,
     reward: 10000,
     blockTime: 60,
     confirmations: 40,
@@ -72,33 +81,12 @@ const coins = {
     explorer: 'https://blockchair.com/dogecoin/transaction/',
     addressPrefixes: ['D']
   },
-  namecoin: {
-    name: 'Namecoin',
-    symbol: 'NMC',
-    algorithm: 'sha256',
-    stratumPort: 3336,
-    reward: 6.25,
-    blockTime: 600,
-    confirmations: 100,
-    segwit: true,
-    mergeMinedWith: 'bitcoin',
-    chainId: 1,
-    auxpowApi: 'createauxblock',
-    daemon: {
-      host: process.env.NMC_RPC_HOST || '127.0.0.1',
-      port: parseInt(process.env.NMC_RPC_PORT) || 8336,
-      user: process.env.NMC_RPC_USER || 'rpcuser',
-      pass: process.env.NMC_RPC_PASS || 'rpcuser'
-    },
-    explorer: 'https://namecoin.info/tx/',
-    addressPrefixes: ['N', 'M']
-  },
   pepecoin: {
     name: 'Pepecoin',
     symbol: 'PEPE',
     algorithm: 'scrypt',
-    stratumPort: 3337,
-    reward: 0, // varies
+    stratumPort: 3335,
+    reward: 0,
     blockTime: 60,
     confirmations: 100,
     mergeMinedWith: 'litecoin',
@@ -117,8 +105,8 @@ const coins = {
     name: 'Bells',
     symbol: 'BELLS',
     algorithm: 'scrypt',
-    stratumPort: 3338,
-    reward: 0, // varies
+    stratumPort: 3336,
+    reward: 0,
     blockTime: 60,
     confirmations: 100,
     segwit: true,
@@ -138,12 +126,12 @@ const coins = {
     name: 'Luckycoin',
     symbol: 'LKY',
     algorithm: 'scrypt',
-    stratumPort: 3339,
-    reward: 0, // varies
+    stratumPort: 3337,
+    reward: 0,
     blockTime: 60,
     confirmations: 100,
     mergeMinedWith: 'litecoin',
-    chainId: 0, // detected at runtime via createauxblock
+    chainId: 0,
     auxpowApi: 'createauxblock',
     daemon: {
       host: process.env.LKY_RPC_HOST || '127.0.0.1',
@@ -158,14 +146,14 @@ const coins = {
     name: 'Junkcoin',
     symbol: 'JKC',
     algorithm: 'scrypt',
-    stratumPort: 3340,
-    reward: 0, // varies
+    stratumPort: 3338,
+    reward: 0,
     blockTime: 60,
     confirmations: 100,
     mergeMinedWith: 'litecoin',
     chainId: 8224,
     auxpowApi: 'createauxblock',
-    payoutAddress: process.env.JKC_PAYOUT_ADDRESS || '', // Required: JKC daemon can't generate addresses
+    payoutAddress: process.env.JKC_PAYOUT_ADDRESS || '',
     daemon: {
       host: process.env.JKC_RPC_HOST || '127.0.0.1',
       port: parseInt(process.env.JKC_RPC_PORT) || 9772,
@@ -179,13 +167,13 @@ const coins = {
     name: 'Dingocoin',
     symbol: 'DINGO',
     algorithm: 'scrypt',
-    stratumPort: 3341,
-    reward: 0, // varies
+    stratumPort: 3339,
+    reward: 0,
     blockTime: 60,
     confirmations: 40,
     mergeMinedWith: 'litecoin',
     chainId: 50,
-    auxpowApi: 'getauxblock',
+    auxpowApi: 'createauxblock',
     daemon: {
       host: process.env.DINGO_RPC_HOST || '127.0.0.1',
       port: parseInt(process.env.DINGO_RPC_PORT) || 34646,
@@ -199,8 +187,8 @@ const coins = {
     name: 'Shibacoin',
     symbol: 'SHIC',
     algorithm: 'scrypt',
-    stratumPort: 3342,
-    reward: 0, // varies
+    stratumPort: 3340,
+    reward: 0,
     blockTime: 60,
     confirmations: 40,
     mergeMinedWith: 'litecoin',
@@ -219,8 +207,8 @@ const coins = {
     name: 'TrumPOW',
     symbol: 'TRMP',
     algorithm: 'scrypt',
-    stratumPort: 3343,
-    reward: 0, // varies
+    stratumPort: 3341,
+    reward: 0,
     blockTime: 60,
     confirmations: 40,
     mergeMinedWith: 'litecoin',

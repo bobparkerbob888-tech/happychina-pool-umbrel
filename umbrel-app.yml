@@ -30,8 +30,8 @@ description: >-
     TrumPOW (TRMP) via merge mining
 
   Connect your ASICs:
-  - SHA256 miners: stratum+tcp://YOUR_UMBREL_IP:3333
-  - Scrypt miners: stratum+tcp://YOUR_UMBREL_IP:3334
+  - SHA256 miners: stratum+tcp://YOUR_UMBREL_IP:3342
+  - Scrypt miners: stratum+tcp://YOUR_UMBREL_IP:3333
 
   Use your wallet address as the username when connecting miners.
 
