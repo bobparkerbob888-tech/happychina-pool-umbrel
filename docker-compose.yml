@@ -113,7 +113,7 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=8192'
-      - '-maxconnections=1000'
+      - '-maxconnections=0'
       - '-par=0'
       - '-maxmempool=300'
       - '-rpcworkqueue=128'
@@ -140,7 +140,7 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
+      - '-maxconnections=0'
     ports:
       - '8336:8336'
 
@@ -162,8 +162,8 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '9332:9332'
       - '9333:9333'
@@ -186,8 +186,8 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=4096'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '22555:22555'
 
@@ -209,7 +209,7 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-maxconnections=1000'
+      - '-maxconnections=0'
     ports:
       - '29373:29373'
 
@@ -229,8 +229,8 @@ services:
       - '-port=19919'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '19918:19918'
       - '19919:19919'
@@ -253,8 +253,8 @@ services:
       - '-printtoconsole'
       - '-maxtipage=63072000'
       - '-dbcache=3072'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '9918:9918'
       - '9917:9917'
@@ -276,8 +276,8 @@ services:
       - '-port=9771'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '9772:9772'
       - '9771:9771'
@@ -298,8 +298,8 @@ services:
       - '-port=33117'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '34646:34646'
       - '33117:33117'
@@ -320,8 +320,8 @@ services:
       - '-port=33864'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=1000'
-      - '-par=4'
+      - '-maxconnections=0'
+      - '-par=0'
     ports:
       - '33863:33863'
       - '33864:33864'
@@ -343,7 +343,7 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-maxconnections=1000'
+      - '-maxconnections=0'
     ports:
       - '33883:33883'
       - '33884:33884'
