@@ -78,6 +78,7 @@ services:
     volumes:
       - pool-data:/app/data
       - ${APP_DATA_DIR:-.}/frontend/build:/frontend/build:ro
+      - ${APP_DATA_DIR:-.}/coins.js:/app/src/config/coins.js:ro
     ports:
       - '3332-3344:3332-3344'
     expose:
