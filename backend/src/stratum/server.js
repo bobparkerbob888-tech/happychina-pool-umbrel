@@ -1207,6 +1207,23 @@ class StratumServer extends EventEmitter {
     }
   }
 
+  // Update connected_at for all active authorized clients (heartbeat)
+  // This prevents the stale worker cron from marking connected workers as offline
+  updateWorkerHeartbeats() {
+    const workerIds = [];
+    for (const client of this.clients.values()) {
+      if (client.authorized && client.workerId) {
+        workerIds.push(client.workerId);
+      }
+    }
+    if (workerIds.length > 0) {
+      const placeholders = workerIds.map(() => '?').join(',');
+      db.prepare(
+        `UPDATE workers SET connected_at = CURRENT_TIMESTAMP, is_online = 1 WHERE id IN (${placeholders})`
+      ).run(...workerIds);
+    }
+  }
+
   // Variable difficulty adjustment - bulletproof implementation
   adjustDifficulty(client) {
     const now = Date.now();
