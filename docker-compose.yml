@@ -97,8 +97,8 @@ services:
 
   # === Coin Daemons ===
   bitcoind:
-    image: lncm/bitcoind:v27.2
-    restart: on-failure
+    image: lncm/bitcoind:v28.0
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/bitcoin:/data/.bitcoin
@@ -113,7 +113,6 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=8192'
-      - '-maxconnections=0'
       - '-par=0'
       - '-maxmempool=300'
       - '-rpcworkqueue=128'
@@ -124,7 +123,7 @@ services:
 
   namecoind:
     image: sevenrats/namecoin-core:latest
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/namecoin:/home/namecoin/.namecoin
@@ -140,13 +139,12 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
     ports:
       - '8336:8336'
 
   litecoind:
     image: uphold/litecoin-core:0.21
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/litecoin:/home/litecoin/.litecoin
@@ -162,15 +160,14 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '9332:9332'
       - '9333:9333'
 
   dogecoind:
-    image: casperstack/dogecoin:latest
-    restart: on-failure
+    image: btcpayserver/dogecoin:1.14.9-amd64
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/dogecoin:/root/.dogecoin
@@ -186,14 +183,18 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=4096'
-      - '-maxconnections=0'
       - '-par=0'
+      - '-addnode=65.108.79.95:22556'
+      - '-addnode=188.40.103.122:22556'
+      - '-addnode=23.88.18.235:22556'
+      - '-addnode=5.9.68.211:22556'
+      - '-addnode=157.173.198.7:22556'
     ports:
       - '22555:22555'
 
   pepecoind:
     image: pepeenthusiast/pepecoin-core:latest
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/pepecoin:/home/pepecoin/.pepecoin
@@ -209,13 +210,12 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-maxconnections=0'
     ports:
       - '29373:29373'
 
   bellsd:
     image: ghcr.io/bobparkerbob888-tech/bellscoin:3.0
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/bells:/root/.bells
@@ -229,7 +229,6 @@ services:
       - '-port=19919'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '19918:19918'
@@ -237,7 +236,7 @@ services:
 
   luckycoind:
     image: btccom/luckycoin:4.0.1
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/luckycoin:/root/.luckycoin
@@ -253,7 +252,6 @@ services:
       - '-printtoconsole'
       - '-maxtipage=63072000'
       - '-dbcache=3072'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '9918:9918'
@@ -261,7 +259,7 @@ services:
 
   junkcoind:
     image: btccom/junkcoin:latest
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/junkcoin:/root/.junkcoin
@@ -276,7 +274,6 @@ services:
       - '-port=9771'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '9772:9772'
@@ -284,7 +281,7 @@ services:
 
   dingocoind:
     image: ghcr.io/bobparkerbob888-tech/dingocoin:v1.18.0.0
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/dingocoin:/root/.dingocoin
@@ -298,7 +295,6 @@ services:
       - '-port=33117'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '34646:34646'
@@ -306,7 +302,7 @@ services:
 
   shibacoind:
     image: ghcr.io/bobparkerbob888-tech/shibacoin:1.2.1
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/shibacoin:/root/.shibacoin
@@ -320,7 +316,6 @@ services:
       - '-port=33864'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-maxconnections=0'
       - '-par=0'
     ports:
       - '33863:33863'
@@ -328,7 +323,7 @@ services:
 
   trumpowd:
     image: ghcr.io/bobparkerbob888-tech/trumpow:1.0
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/trumpow:/root/.trumpow
@@ -343,7 +338,6 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-maxconnections=0'
     ports:
       - '33883:33883'
       - '33884:33884'
