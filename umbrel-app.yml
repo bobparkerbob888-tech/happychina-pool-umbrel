@@ -3,7 +3,7 @@ id: happychina-pool
 name: HappyChina Mining Pool
 tagline: Multi-coin Scrypt mining pool with merge mining
 icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/icon.png
-category: bitcoin
+category: finance
 version: "2.0.0"
 port: 8080
 description: >-

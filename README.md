@@ -1,13 +1,13 @@
 # HappyChina Mining Pool
 
-A full-featured multi-coin cryptocurrency mining pool with web dashboard, designed for Umbrel.
+A full-featured multi-coin Scrypt mining pool with merge mining and web dashboard, designed for Umbrel.
 
 ## Features
 
-- **Multi-algorithm support**: SHA-256, Scrypt
-- **11 coins**: Bitcoin, Namecoin, Litecoin, Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW
-- **Merge mining**: Namecoin merge-mined with Bitcoin (SHA-256); Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW merge-mined with Litecoin (Scrypt)
-- **Two stratum ports**: SHA-256 miners connect to one port, Scrypt miners to another — all merge-mined coins are found automatically
+- **Scrypt algorithm**: Optimized for Scrypt ASIC miners
+- **9 coins**: Litecoin, Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW
+- **Merge mining**: Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW all merge-mined with Litecoin — mine 9 coins at once!
+- **Single stratum port**: All Scrypt miners connect to one port, all merge-mined coins are found automatically
 - **PPLNS rewards**: Pay Per Last N Shares payment system
 - **Automatic payouts**: Hourly payment processing
 - **Web dashboard**: Real-time hashrate charts, worker management, payment history
@@ -17,17 +17,17 @@ A full-featured multi-coin cryptocurrency mining pool with web dashboard, design
 - **REST API**: Full API access for programmatic monitoring
 - **Docker support**: Easy deployment with docker-compose
 - **Variable difficulty**: Automatic per-client difficulty adjustment
-- **mining.configure**: Version rolling support for ASICs (BIP320)
 
 ## Stratum Ports
 
 | Port | Algorithm | Primary Coin | Merge-Mined Coins |
 |------|-----------|-------------|-------------------|
-| 3342 | SHA-256   | Bitcoin (BTC) | Namecoin (NMC) |
 | 3333 | Scrypt    | Litecoin (LTC) | DOGE, PEPE, BELLS, LKY, JKC, DINGO, SHIC, TRMP |
 
+Additional ports:
+- **3344**: Low difficulty (CPU/GPU miners)
+
 Connect your miners:
-- **SHA-256 ASICs**: `stratum+tcp://YOUR_UMBREL_IP:3342`
 - **Scrypt ASICs**: `stratum+tcp://YOUR_UMBREL_IP:3333`
 
 Use your wallet address as the username.
@@ -88,7 +88,7 @@ happychina-pool/
 │       ├── models/
 │       │   └── database.js       # SQLite schema + connection
 │       ├── stratum/
-│       │   └── server.js         # Stratum protocol server (multi-algo)
+│       │   └── server.js         # Stratum protocol server (Scrypt)
 │       └── services/
 │           ├── shareProcessor.js  # PPLNS reward calculation
 │           ├── paymentProcessor.js # Automatic payments
@@ -107,13 +107,7 @@ happychina-pool/
 └── README.md
 ```
 
-## Supported Coins
-
-### SHA-256 (port 3342)
-| Coin | Symbol | Type | Block Time |
-|------|--------|------|-----------|
-| Bitcoin | BTC | Primary | 10 min |
-| Namecoin | NMC | Merge-mined with BTC | 10 min |
+## Supported Coins (9 total)
 
 ### Scrypt (port 3333)
 | Coin | Symbol | Type | Block Time |
@@ -152,14 +146,13 @@ happychina-pool/
 
 ## Disk Space Requirements
 
-This pool runs 11 blockchain daemons. Full sync requires approximately:
-- Bitcoin: ~850GB
+This pool runs 9 blockchain daemons. Full sync requires approximately:
 - Litecoin: ~250GB
 - Bells: ~400GB
 - Dogecoin: ~220GB
 - Other coins: ~30GB total
 
-**Total: ~1.75TB**
+**Total: ~900GB**
 
 ## Other Versions
 
