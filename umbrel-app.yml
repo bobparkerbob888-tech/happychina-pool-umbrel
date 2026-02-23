@@ -1,0 +1,35 @@
+manifestVersion: 1
+id: happychina-pool
+name: HappyChina Mining Pool
+tagline: Multi-coin SHA256 + Scrypt mining pool with merge mining
+icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/icon.png
+category: bitcoin
+version: "2.0.0"
+port: 8080
+description: >-
+  A complete multi-algorithm mining pool for your Umbrel server.
+  Features a Node.js stratum server for SHA256 and Scrypt,
+  with a modern React dashboard and admin panel.
+
+  Supported coins:
+  - SHA256: Bitcoin (BTC), Namecoin (NMC) via merge mining
+  - Scrypt: Litecoin (LTC), Dogecoin (DOGE), Pepecoin (PEPE), Bells (BELLS),
+    Luckycoin (LKY), Junkcoin (JKC), Dingocoin (DINGO), Shibacoin (SHIC),
+    TrumPOW (TRMP) via merge mining
+
+  Connect your ASICs:
+  - SHA256 miners: stratum+tcp://YOUR_UMBREL_IP:3333
+  - Scrypt miners: stratum+tcp://YOUR_UMBREL_IP:3334
+
+  Use your wallet address as the username when connecting miners.
+
+  ⚠️ DISK SPACE: This app runs 11 blockchain daemons and requires
+  approximately 500GB+ of disk space for full sync. Ensure your
+  Umbrel has sufficient storage before installing.
+
+developer: HappyChina
+website: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
+repo: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
+support: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel/issues
+dependencies: []
+permissions: []
