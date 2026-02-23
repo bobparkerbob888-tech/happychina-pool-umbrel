@@ -14,13 +14,9 @@ services:
     image: ghcr.io/bobparkerbob888-tech/happychina-pool-backend:2.1.0
     restart: on-failure
     depends_on:
-      bitcoind:
-        condition: service_started
       litecoind:
         condition: service_started
       dogecoind:
-        condition: service_started
-      namecoind:
         condition: service_started
       pepecoind:
         condition: service_started
@@ -43,10 +39,6 @@ services:
       POOL_NAME: 'HappyChina Pool'
       POOL_FEE: '1.0'
       DB_PATH: /app/data/pool.db
-      BTC_RPC_HOST: bitcoind
-      BTC_RPC_PORT: '8332'
-      BTC_RPC_USER: umbrel
-      BTC_RPC_PASS: umbrel
       LTC_RPC_HOST: litecoind
       LTC_RPC_PORT: '9332'
       LTC_RPC_USER: umbrel
@@ -55,10 +47,6 @@ services:
       DOGE_RPC_PORT: '22555'
       DOGE_RPC_USER: umbrel
       DOGE_RPC_PASS: umbrel
-      NMC_RPC_HOST: namecoind
-      NMC_RPC_PORT: '8336'
-      NMC_RPC_USER: umbrel
-      NMC_RPC_PASS: umbrel
       PEPE_RPC_HOST: pepecoind
       PEPE_RPC_PORT: '29373'
       PEPE_RPC_USER: umbrel
@@ -105,54 +93,6 @@ services:
       - '80'
 
   # === Coin Daemons ===
-  bitcoind:
-    image: lncm/bitcoind:v27.2
-    restart: on-failure
-    stop_grace_period: 15m
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/bitcoin:/data/.bitcoin
-    command:
-      - '-server=1'
-      - '-rpcuser=umbrel'
-      - '-rpcpassword=umbrel'
-      - '-rpcallowip=0.0.0.0/0'
-      - '-rpcbind=0.0.0.0'
-      - '-rpcport=8332'
-      - '-port=8333'
-      - '-txindex=1'
-      - '-printtoconsole'
-      - '-dbcache=8192'
-      - '-maxconnections=1000'
-      - '-par=0'
-      - '-maxmempool=300'
-      - '-rpcworkqueue=128'
-      - '-rpcthreads=8'
-    ports:
-      - '8332:8332'
-      - '8333:8333'
-
-  namecoind:
-    image: sevenrats/namecoin-core:latest
-    restart: on-failure
-    stop_grace_period: 15m
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/namecoin:/home/namecoin/.namecoin
-    command:
-      - namecoind
-      - '-server=1'
-      - '-rpcuser=umbrel'
-      - '-rpcpassword=umbrel'
-      - '-rpcallowip=0.0.0.0/0'
-      - '-rpcbind=0.0.0.0'
-      - '-rpcport=8336'
-      - '-port=8334'
-      - '-txindex=1'
-      - '-printtoconsole'
-      - '-dbcache=512'
-      - '-maxconnections=1000'
-    ports:
-      - '8336:8336'
-
   litecoind:
     image: uphold/litecoin-core:0.21
     restart: on-failure
