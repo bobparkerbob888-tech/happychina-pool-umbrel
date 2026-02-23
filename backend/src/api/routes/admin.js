@@ -132,13 +132,14 @@ router.get('/settings', (req, res) => {
     pool_fee: parseFloat(getSetting('pool_fee', config.pool.fee)),
     payout_threshold: parseFloat(getSetting('payout_threshold', config.pool.payoutThreshold)),
     payout_interval: parseInt(getSetting('payout_interval', config.pool.payoutInterval)),
+    node_mode: getSetting('node_mode', process.env.NODE_MODE || 'full'),
     stratum_host: config.stratum.host
   });
 });
 
 // Update pool settings
 router.put('/settings', (req, res) => {
-  const { pool_name, pool_fee, payout_threshold, payout_interval } = req.body;
+  const { pool_name, pool_fee, payout_threshold, payout_interval, node_mode } = req.body;
 
   const upsert = db.prepare(`
     INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -168,10 +169,18 @@ router.put('/settings', (req, res) => {
       upsert.run('payout_interval', String(interval));
       config.pool.payoutInterval = interval;
     }
+    if (node_mode !== undefined) {
+      if (!['full', 'pruned'].includes(node_mode)) return res.status(400).json({ error: 'Node mode must be "full" or "pruned"' });
+      upsert.run('node_mode', node_mode);
+    }
   });
 
   transaction();
-  res.json({ message: 'Settings updated' });
+
+  const restartNeeded = node_mode !== undefined;
+  res.json({ 
+    message: 'Settings updated' + (restartNeeded ? '. ⚠️ Node mode changed - restart the app from Umbrel dashboard for changes to take effect.' : '')
+  });
 });
 
 // Get per-coin settings

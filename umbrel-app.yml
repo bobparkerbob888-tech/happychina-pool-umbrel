@@ -15,8 +15,13 @@ description: >-
   1. Open the app after installation
   2. Click "Register" to create your account
   3. The FIRST account registered automatically becomes the admin
-  4. Set your wallet addresses in your profile settings
-  5. Connect your miners and start mining!
+  4. Go to Admin → Settings to choose Full or Pruned node mode
+  5. Set your wallet addresses in your profile settings
+  6. Connect your miners and start mining!
+
+  💾 NODE MODE: Choose between Full nodes (requires ~500GB+, keeps
+  full blockchain history) or Pruned nodes (requires ~50GB, saves
+  disk space). Change this in Admin → Settings after setup.
 
   Supported coins:
   - SHA256: Bitcoin (BTC), Namecoin (NMC) via merge mining
