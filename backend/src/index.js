@@ -1,4 +1,5 @@
 require('dotenv').config();
+// Crash protection - prevent unhandled errors from killing the processprocess.on("uncaughtException", (err) => { console.error("[FATAL] Uncaught exception:", err.message); });process.on("unhandledRejection", (err) => { console.error("[FATAL] Unhandled rejection:", err); });
 
 const express = require('express');
 const cors = require('cors');
@@ -85,39 +86,12 @@ cron.schedule('0 * * * *', () => {
   paymentProcessor.processPayments();
 });
 
-// Update heartbeats for connected stratum workers every 5 minutes
-cron.schedule('*/5 * * * *', () => {
-  stratumServer.updateWorkerHeartbeats();
-});
-
 // Clean stale workers every 10 minutes
 cron.schedule('*/10 * * * *', () => {
-  // Use SQLite datetime() for proper comparison (CURRENT_TIMESTAMP format: 'YYYY-MM-DD HH:MM:SS')
-  // Only mark offline if both last_share AND connected_at are older than 15 minutes
-  // This prevents marking workers offline that are connected but haven't submitted a share yet
-  // (e.g. high difficulty coins where shares are infrequent)
-  const staleWorkers = db.prepare(`
-    UPDATE workers SET is_online = 0
-    WHERE is_online = 1
-      AND (last_share IS NULL OR last_share < datetime('now', '-15 minutes'))
-      AND (connected_at IS NULL OR connected_at < datetime('now', '-15 minutes'))
-  `).run();
-
-  // Also cross-check with active stratum connections
-  const onlineWorkerIds = [];
-  for (const client of stratumServer.clients.values()) {
-    if (client.authorized && client.workerId) {
-      onlineWorkerIds.push(client.workerId);
-    }
-  }
-
-  // Re-mark workers as online if they have an active stratum connection
-  if (onlineWorkerIds.length > 0) {
-    const placeholders = onlineWorkerIds.map(() => '?').join(',');
-    db.prepare(
-      `UPDATE workers SET is_online = 1 WHERE id IN (${placeholders}) AND is_online = 0`
-    ).run(...onlineWorkerIds);
-  }
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  db.prepare(
+    'UPDATE workers SET is_online = 0 WHERE is_online = 1 AND last_share < ?'
+  ).run(tenMinAgo);
 });
 
 // Start HTTP server

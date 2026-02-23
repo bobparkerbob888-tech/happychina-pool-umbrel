@@ -1,19 +1,41 @@
 services:
   # === App Proxy (Umbrel integration) ===
+  # Umbrel's app-script merges docker-compose.app_proxy.yml which provides
+  # the full app_proxy config (image, env vars, volumes, network).
+  # We only need to set APP_HOST and APP_PORT here.
   app_proxy:
-    image: getumbrel/app-proxy:1.0.0
-    restart: on-failure
     environment:
       APP_HOST: frontend
-      APP_PORT: '80'
+      APP_PORT: 80
       PROXY_AUTH_ADD: 'false'
-    volumes:
-      - ${APP_DATA_DIR:-.}/umbrel-app.yml:/extra/umbrel-app.yml:ro
 
-  # === Backend API (Node.js + SQLite) ===
+  # === Backend API (Node.js + Stratum + SQLite) ===
   backend:
     image: ghcr.io/bobparkerbob888-tech/happychina-pool-backend:2.1.0
     restart: on-failure
+    depends_on:
+      bitcoind:
+        condition: service_started
+      litecoind:
+        condition: service_started
+      dogecoind:
+        condition: service_started
+      namecoind:
+        condition: service_started
+      pepecoind:
+        condition: service_started
+      bellsd:
+        condition: service_started
+      luckycoind:
+        condition: service_started
+      junkcoind:
+        condition: service_started
+      dingocoind:
+        condition: service_started
+      shibacoind:
+        condition: service_started
+      trumpowd:
+        condition: service_started
     environment:
       PORT: '8080'
       HOST: '0.0.0.0'
@@ -69,22 +91,9 @@ services:
       - pool-data:/app/data
       - ${APP_DATA_DIR:-.}/frontend/build:/frontend/build:ro
     ports:
-      - '8080:8080'
       - '3332-3344:3332-3344'
     expose:
       - '8080'
-
-  # === Init: fix data directory permissions ===
-  init:
-    image: alpine:3.19
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        chmod -R 777 /data/bitcoin /data/namecoin 2>/dev/null || true
-        echo "Permissions fixed."
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/bitcoin:/data/bitcoin
-      - ${APP_DATA_DIR:-.}/data/namecoin:/data/namecoin
 
   # === Frontend (React + Nginx) ===
   frontend:
@@ -97,8 +106,8 @@ services:
 
   # === Coin Daemons ===
   bitcoind:
-    image: lncm/bitcoind:v28.0
-    restart: unless-stopped
+    image: lncm/bitcoind:v27.2
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/bitcoin:/data/.bitcoin
@@ -113,28 +122,18 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=8192'
+      - '-maxconnections=1000'
       - '-par=0'
       - '-maxmempool=300'
       - '-rpcworkqueue=128'
       - '-rpcthreads=8'
-      - '-addnode=85.172.205.112:8333'
-      - '-addnode=173.52.59.232:8333'
-      - '-addnode=18.102.201.234:8333'
-      - '-addnode=154.38.167.152:8333'
-      - '-addnode=80.244.26.192:8333'
-      - '-addnode=46.126.216.3:8333'
-      - '-addnode=91.134.242.112:8333'
-      - '-addnode=77.74.80.44:8333'
-      - '-addnode=75.119.150.111:8333'
-      - '-addnode=162.81.160.34:8333'
-      - '-addnode=200.40.68.166:8333'
     ports:
       - '8332:8332'
       - '8333:8333'
 
   namecoind:
     image: sevenrats/namecoin-core:latest
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/namecoin:/home/namecoin/.namecoin
@@ -150,22 +149,13 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-addnode=47.252.14.48:8334'
-      - '-addnode=54.38.193.222:8334'
-      - '-addnode=162.210.198.133:8334'
-      - '-addnode=15.204.102.127:8334'
-      - '-addnode=69.147.224.249:8334'
-      - '-addnode=1.34.195.13:8334'
-      - '-addnode=174.64.33.221:8334'
-      - '-addnode=23.108.191.178:8334'
-      - '-addnode=23.106.38.116:8334'
-      - '-addnode=47.254.178.44:8334'
+      - '-maxconnections=1000'
     ports:
       - '8336:8336'
 
   litecoind:
     image: uphold/litecoin-core:0.21
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/litecoin:/home/litecoin/.litecoin
@@ -181,24 +171,15 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-par=0'
-      - '-addnode=46.4.30.230:9333'
-      - '-addnode=125.30.60.243:9333'
-      - '-addnode=18.204.86.135:9333'
-      - '-addnode=23.176.184.73:9333'
-      - '-addnode=64.31.54.136:9333'
-      - '-addnode=97.103.138.106:9333'
-      - '-addnode=80.235.91.30:9333'
-      - '-addnode=148.113.165.77:9333'
-      - '-addnode=82.42.128.130:9333'
-      - '-addnode=54.38.22.248:9333'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '9332:9332'
       - '9333:9333'
 
   dogecoind:
-    image: btcpayserver/dogecoin:1.14.9-amd64
-    restart: unless-stopped
+    image: casperstack/dogecoin:latest
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/dogecoin:/root/.dogecoin
@@ -214,21 +195,14 @@ services:
       - '-txindex=1'
       - '-printtoconsole'
       - '-dbcache=4096'
-      - '-par=0'
-      - '-addnode=65.108.79.95:22556'
-      - '-addnode=188.40.103.122:22556'
-      - '-addnode=23.88.18.235:22556'
-      - '-addnode=5.9.68.211:22556'
-      - '-addnode=157.173.198.7:22556'
-      - '-addnode=73.115.234.177:22556'
-      - '-addnode=34.102.117.51:22556'
-      - '-addnode=18.182.0.8:22556'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '22555:22555'
 
   pepecoind:
     image: pepeenthusiast/pepecoin-core:latest
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/pepecoin:/home/pepecoin/.pepecoin
@@ -244,20 +218,13 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-addnode=64.227.69.247:33874'
-      - '-addnode=93.183.74.134:33874'
-      - '-addnode=8.218.231.1:33874'
-      - '-addnode=129.226.214.169:33874'
-      - '-addnode=185.194.216.135:33874'
-      - '-addnode=157.173.198.7:33874'
-      - '-addnode=173.173.80.247:33874'
-      - '-addnode=168.119.88.177:33874'
+      - '-maxconnections=1000'
     ports:
       - '29373:29373'
 
   bellsd:
     image: ghcr.io/bobparkerbob888-tech/bellscoin:3.0
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/bells:/root/.bells
@@ -271,24 +238,15 @@ services:
       - '-port=19919'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-par=0'
-      - '-addnode=8.219.236.241:19919'
-      - '-addnode=15.235.54.217:19919'
-      - '-addnode=149.50.101.189:20045'
-      - '-addnode=95.141.241.26:19919'
-      - '-addnode=84.46.241.242:19919'
-      - '-addnode=98.80.234.184:19919'
-      - '-addnode=15.204.108.244:19919'
-      - '-addnode=45.18.94.250:19919'
-      - '-addnode=157.90.88.178:9156'
-      - '-addnode=168.119.136.54:19919'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '19918:19918'
       - '19919:19919'
 
   luckycoind:
     image: btccom/luckycoin:4.0.1
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/luckycoin:/root/.luckycoin
@@ -304,17 +262,15 @@ services:
       - '-printtoconsole'
       - '-maxtipage=63072000'
       - '-dbcache=3072'
-      - '-par=0'
-      - '-addnode=93.183.74.134:9917'
-      - '-addnode=189.1.216.178:9917'
-      - '-addnode=54.70.207.34:9917'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '9918:9918'
       - '9917:9917'
 
   junkcoind:
     image: btccom/junkcoin:latest
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/junkcoin:/root/.junkcoin
@@ -329,21 +285,15 @@ services:
       - '-port=9771'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-par=0'
-      - '-addnode=3.66.245.44:9771'
-      - '-addnode=44.239.182.86:9771'
-      - '-addnode=204.12.227.26:9771'
-      - '-addnode=93.183.74.134:9771'
-      - '-addnode=37.202.222.147:9771'
-      - '-addnode=3.212.41.153:9771'
-      - '-addnode=8.218.231.1:9771'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '9772:9772'
       - '9771:9771'
 
   dingocoind:
     image: ghcr.io/bobparkerbob888-tech/dingocoin:v1.18.0.0
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/dingocoin:/root/.dingocoin
@@ -357,22 +307,15 @@ services:
       - '-port=33117'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-par=0'
-      - '-addnode=67.205.139.135:33117'
-      - '-addnode=95.217.56.57:33117'
-      - '-addnode=54.84.154.21:33117'
-      - '-addnode=3.212.41.153:33117'
-      - '-addnode=3.69.75.33:33117'
-      - '-addnode=98.80.234.184:33117'
-      - '-addnode=128.199.105.80:33117'
-      - '-addnode=34.231.23.75:33117'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '34646:34646'
       - '33117:33117'
 
   shibacoind:
     image: ghcr.io/bobparkerbob888-tech/shibacoin:1.2.1
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/shibacoin:/root/.shibacoin
@@ -386,22 +329,15 @@ services:
       - '-port=33864'
       - '-printtoconsole'
       - '-dbcache=512'
-      - '-par=0'
-      - '-addnode=157.173.201.78:33864'
-      - '-addnode=37.202.222.147:33864'
-      - '-addnode=204.12.227.26:33864'
-      - '-addnode=68.95.184.113:33864'
-      - '-addnode=89.117.16.197:33864'
-      - '-addnode=57.128.236.79:33864'
-      - '-addnode=69.229.12.113:33864'
-      - '-addnode=134.255.179.128:33864'
+      - '-maxconnections=1000'
+      - '-par=4'
     ports:
       - '33863:33863'
       - '33864:33864'
 
   trumpowd:
     image: ghcr.io/bobparkerbob888-tech/trumpow:1.0
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 15m
     volumes:
       - ${APP_DATA_DIR:-.}/data/trumpow:/root/.trumpow
@@ -416,14 +352,7 @@ services:
       - '-printtoconsole'
       - '-dbcache=512'
       - '-par=0'
-      - '-addnode=8.218.231.1:33884'
-      - '-addnode=128.199.174.93:33884'
-      - '-addnode=37.202.222.147:33884'
-      - '-addnode=81.0.247.253:33884'
-      - '-addnode=3.212.41.153:33884'
-      - '-addnode=52.29.144.46:33884'
-      - '-addnode=47.236.109.213:33884'
-      - '-addnode=148.113.191.147:33884'
+      - '-maxconnections=1000'
     ports:
       - '33883:33883'
       - '33884:33884'
