@@ -38,7 +38,9 @@ export function formatDate(date) {
 
 export function formatTimeAgo(date) {
   if (!date) return 'Never';
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  // SQLite CURRENT_TIMESTAMP returns UTC without 'Z' suffix - append it so JS parses as UTC
+  const dateStr = typeof date === 'string' && !date.endsWith('Z') ? date + 'Z' : date;
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
 
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
