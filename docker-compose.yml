@@ -90,7 +90,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - bitcoin-data:/data/.bitcoin
+      - ${APP_DATA_DIR:-.}/data/bitcoin:/data/.bitcoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -116,7 +116,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - namecoin-data:/home/namecoin/.namecoin
+      - ${APP_DATA_DIR:-.}/data/namecoin:/home/namecoin/.namecoin
     command:
       - namecoind
       - '-server=1'
@@ -138,7 +138,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - litecoin-data:/home/litecoin/.litecoin
+      - ${APP_DATA_DIR:-.}/data/litecoin:/home/litecoin/.litecoin
     command:
       - litecoind
       - '-server=1'
@@ -162,7 +162,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - dogecoin-data:/root/.dogecoin
+      - ${APP_DATA_DIR:-.}/data/dogecoin:/root/.dogecoin
     command:
       - dogecoind
       - '-server=1'
@@ -185,7 +185,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - pepecoin-data:/home/pepecoin/.pepecoin
+      - ${APP_DATA_DIR:-.}/data/pepecoin:/home/pepecoin/.pepecoin
     command:
       - pepecoind
       - '-server=1'
@@ -207,7 +207,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - bells-data:/root/.bells
+      - ${APP_DATA_DIR:-.}/data/bells:/root/.bells
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -229,7 +229,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - luckycoin-data:/root/.luckycoin
+      - ${APP_DATA_DIR:-.}/data/luckycoin:/root/.luckycoin
     command:
       - /bin/luckycoind
       - '-server=1'
@@ -253,7 +253,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - junkcoin-data:/root/.junkcoin
+      - ${APP_DATA_DIR:-.}/data/junkcoin:/root/.junkcoin
     command:
       - /usr/local/bin/junkcoind
       - '-server=1'
@@ -276,7 +276,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - dingocoin-data:/root/.dingocoin
+      - ${APP_DATA_DIR:-.}/data/dingocoin:/root/.dingocoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -298,7 +298,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - shibacoin-data:/root/.shibacoin
+      - ${APP_DATA_DIR:-.}/data/shibacoin:/root/.shibacoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -320,7 +320,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - trumpow-data:/root/.trumpow
+      - ${APP_DATA_DIR:-.}/data/trumpow:/root/.trumpow
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -339,14 +339,3 @@ services:
 
 volumes:
   pool-data:
-  bitcoin-data:
-  namecoin-data:
-  litecoin-data:
-  dogecoin-data:
-  pepecoin-data:
-  bells-data:
-  luckycoin-data:
-  junkcoin-data:
-  dingocoin-data:
-  shibacoin-data:
-  trumpow-data:
