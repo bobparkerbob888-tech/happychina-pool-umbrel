@@ -51,7 +51,6 @@ function Workers() {
   };
 
   // Per-coin hashrates
-  const btcHashrate = workers.filter(w => w.coin === 'bitcoin' && w.is_online).reduce((s, w) => s + w.hashrate, 0);
   const ltcHashrate = workers.filter(w => w.coin === 'litecoin' && w.is_online).reduce((s, w) => s + w.hashrate, 0);
 
   return (
@@ -66,13 +65,6 @@ function Workers() {
           <div className="label">Online Workers</div>
           <div className="value">{onlineCount}</div>
         </div>
-        {btcHashrate > 0 && (
-          <div className="stat-card" style={{ borderLeft: '3px solid #f7931a' }}>
-            <div className="label">⛏️ Bitcoin (SHA-256)</div>
-            <div className="value">{formatHashrate(btcHashrate)}</div>
-            <div className="label" style={{ marginTop: 4 }}>TTF Block: <strong>{getTimeToBlockByCoin('bitcoin')}</strong></div>
-          </div>
-        )}
         {ltcHashrate > 0 && (
           <div className="stat-card" style={{ borderLeft: '3px solid #bfbbbb' }}>
             <div className="label">⛏️ Litecoin (Scrypt)</div>

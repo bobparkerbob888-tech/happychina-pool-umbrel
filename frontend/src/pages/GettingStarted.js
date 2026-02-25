@@ -55,9 +55,8 @@ function GettingStarted() {
           </div>
           <p>Choose mining software compatible with your hardware and the algorithm you want to mine:</p>
           <ul className="gs-list">
-            <li><strong>SHA-256 ASIC miners:</strong> Use the built-in firmware configuration (Antminer, Whatsminer)</li>
-            <li><strong>Scrypt ASIC miners:</strong> Antminer L7, Goldshell, or similar Scrypt ASICs</li>
-            <li><strong>GPU/CPU mining:</strong> CGMiner, BFGMiner for SHA-256 and Scrypt coins</li>
+            <li><strong>Scrypt ASIC miners:</strong> Antminer L7/L9, Goldshell, or similar - use the built-in firmware configuration</li>
+            <li><strong>GPU/CPU mining:</strong> CGMiner, BFGMiner for Scrypt coins</li>
           </ul>
         </div>
 

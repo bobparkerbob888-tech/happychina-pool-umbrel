@@ -26,6 +26,11 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
 
+// UTC Timestamp fix - converts all SQLite "YYYY-MM-DD HH:MM:SS" timestamps
+// to proper ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" so frontend Date() treats them as UTC
+const { utcTimestamps } = require('./middleware/utcTimestamps');
+app.use(utcTimestamps);
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/pool', poolRoutes);

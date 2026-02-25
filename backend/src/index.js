@@ -27,6 +27,11 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
 
+// UTC Timestamp fix - converts all SQLite "YYYY-MM-DD HH:MM:SS" timestamps
+// to proper ISO 8601 "YYYY-MM-DDTHH:MM:SSZ" so frontend Date() treats them as UTC
+const { utcTimestamps } = require('./middleware/utcTimestamps');
+app.use(utcTimestamps);
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/pool', poolRoutes);
@@ -88,10 +93,16 @@ cron.schedule('0 * * * *', () => {
 
 // Clean stale workers every 10 minutes
 cron.schedule('*/10 * * * *', () => {
-  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  db.prepare(
-    'UPDATE workers SET is_online = 0 WHERE is_online = 1 AND last_share < ?'
-  ).run(tenMinAgo);
+  // Use SQLite datetime() for proper comparison (CURRENT_TIMESTAMP format: 'YYYY-MM-DD HH:MM:SS')
+  // Only mark offline if both last_share AND connected_at are older than 15 minutes
+  // This prevents marking workers offline that are connected but haven't submitted a share yet
+  // (e.g. high difficulty coins where shares are infrequent)
+  db.prepare(`
+    UPDATE workers SET is_online = 0
+    WHERE is_online = 1
+      AND (last_share IS NULL OR last_share < datetime('now', '-15 minutes'))
+      AND (connected_at IS NULL OR connected_at < datetime('now', '-15 minutes'))
+  `).run();
 });
 
 // Start HTTP server

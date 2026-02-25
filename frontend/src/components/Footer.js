@@ -21,7 +21,6 @@ function Footer() {
         <div className="footer-section">
           <h4>Algorithms</h4>
           <ul>
-            <li>SHA-256 (Bitcoin, Namecoin)</li>
             <li>Scrypt (Litecoin, Dogecoin, Pepecoin, Bells, Luckycoin, Junkcoin, Dingocoin, Shibacoin, TrumPOW)</li>
           </ul>
         </div>

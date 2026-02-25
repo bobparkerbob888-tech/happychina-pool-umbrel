@@ -862,7 +862,7 @@ class StratumServer extends EventEmitter {
       ).run(client.userId, client.workerId, client.coin, client.algorithm, client.difficulty, result.shareDiff, result.isBlock ? 1 : 0);
 
       db.prepare(
-        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
+        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, is_online = 1, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
       ).run(client.difficulty, result.shareDiff, client.workerId);
 
       if (result.isBlock) {
