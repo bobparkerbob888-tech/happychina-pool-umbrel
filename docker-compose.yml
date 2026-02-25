@@ -90,7 +90,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/bitcoin:/data/.bitcoin
+      - bitcoin-data:/data/.bitcoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -116,7 +116,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/namecoin:/home/namecoin/.namecoin
+      - namecoin-data:/home/namecoin/.namecoin
     command:
       - namecoind
       - '-server=1'
@@ -138,7 +138,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/litecoin:/home/litecoin/.litecoin
+      - litecoin-data:/home/litecoin/.litecoin
     command:
       - litecoind
       - '-server=1'
@@ -162,7 +162,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/dogecoin:/root/.dogecoin
+      - dogecoin-data:/root/.dogecoin
     command:
       - dogecoind
       - '-server=1'
@@ -185,7 +185,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/pepecoin:/home/pepecoin/.pepecoin
+      - pepecoin-data:/home/pepecoin/.pepecoin
     command:
       - pepecoind
       - '-server=1'
@@ -207,7 +207,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/bells:/root/.bells
+      - bells-data:/root/.bells
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -229,7 +229,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/luckycoin:/root/.luckycoin
+      - luckycoin-data:/root/.luckycoin
     command:
       - /bin/luckycoind
       - '-server=1'
@@ -253,7 +253,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/junkcoin:/root/.junkcoin
+      - junkcoin-data:/root/.junkcoin
     command:
       - /usr/local/bin/junkcoind
       - '-server=1'
@@ -276,7 +276,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/dingocoin:/root/.dingocoin
+      - dingocoin-data:/root/.dingocoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -298,7 +298,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/shibacoin:/root/.shibacoin
+      - shibacoin-data:/root/.shibacoin
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -320,7 +320,7 @@ services:
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - /home/umbrel/umbrel/app-data/mining-yiimp/data/trumpow:/root/.trumpow
+      - trumpow-data:/root/.trumpow
     command:
       - '-server=1'
       - '-rpcuser=umbrel'
@@ -339,3 +339,14 @@ services:
 
 volumes:
   pool-data:
+  bitcoin-data:
+  namecoin-data:
+  litecoin-data:
+  dogecoin-data:
+  pepecoin-data:
+  bells-data:
+  luckycoin-data:
+  junkcoin-data:
+  dingocoin-data:
+  shibacoin-data:
+  trumpow-data:
