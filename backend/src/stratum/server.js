@@ -1352,10 +1352,14 @@ class StratumServer extends EventEmitter {
       }
 
       const header = buildHeaderYiimp(versionHex, job.prevHashStratum, merkleRoot, nTime, job.nbits, nonce);
+      if (header.length !== 80) {
+        console.error(`[MergeMining] Parent header wrong length: ${header.length} (expected 80)`);
+        return;
+      }
 
-      // Compute coinbase merkle branch (path from coinbase to parent merkle root)
-      const txHashes = job.template.transactions.map(tx => tx.txid || tx.hash);
-      const coinbaseMerkleBranch = auxpow.computeCoinbaseMerkleBranch(coinbaseHash, txHashes);
+      // Use stratum merkle branches directly as coinbase merkle branch
+      // (computeCoinbaseMerkleBranch had byte-order bug mixing internal/display order txids)
+      const coinbaseMerkleBranch = job.merkleBranches.map(h => Buffer.from(h, 'hex'));
 
       // Get aux merkle branch for this specific chain
       const auxBranchData = job.auxData.branches.get(auxCoinId);
