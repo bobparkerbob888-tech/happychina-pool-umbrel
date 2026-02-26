@@ -381,6 +381,7 @@ class StratumServer extends EventEmitter {
           address: null // Will be fetched on first aux block request
         });
         this.daemons.set(coinId, daemon);
+        daemon.setChainId(coin.chainId || 0);
         console.log(`[MergeMining] ${coin.name} (chainId=${coin.chainId}) will merge-mine with ${parentId}`);
       }
     }
@@ -398,7 +399,7 @@ class StratumServer extends EventEmitter {
 
     for (const portConfig of ports) {
       const server = net.createServer((socket) => {
-        this.handleConnection(socket, coinId, coin, portConfig.diff);
+        this.handleConnection(socket, coinId, coin, portConfig.diff, portConfig.fixedDiff);
       });
 
       server.listen(portConfig.port, config.stratum.host, () => {
@@ -456,6 +457,32 @@ class StratumServer extends EventEmitter {
     // Poll every 5 seconds
     const interval = setInterval(poll, 5000);
     this.templatePollers.set(coinId, interval);
+
+    // Periodic job refresh: send new jobs every 30s even without new blocks
+    // This keeps ASIC miners (especially Antminer) connected by providing fresh work
+    const refreshInterval = setInterval(() => {
+      const template = this.templates.get(coinId);
+      if (!template) return;
+      let clientCount = 0;
+      for (const client of this.clients.values()) {
+        if (client.coin === coinId && client.subscribed && client.authorized) {
+          this.sendJob(client, false); // cleanJobs=false so miner keeps working on current shares
+          clientCount++;
+        }
+      }
+      if (clientCount > 0) {
+        // Only log occasionally to avoid spam
+        if (!this._refreshLogCount) this._refreshLogCount = {};
+        if (!this._refreshLogCount[coinId]) this._refreshLogCount[coinId] = 0;
+        this._refreshLogCount[coinId]++;
+        if (this._refreshLogCount[coinId] % 10 === 1) {
+          console.log(`[Stratum] Periodic job refresh for ${coin.name}: ${clientCount} clients`);
+        }
+      }
+    }, 30000);
+    // Store so we can clean up
+    if (!this.refreshPollers) this.refreshPollers = new Map();
+    this.refreshPollers.set(coinId, refreshInterval);
   }
 
   // Fetch/refresh aux blocks from all merge-mined children of a parent chain
@@ -511,7 +538,7 @@ class StratumServer extends EventEmitter {
           }
           child.auxBlock = auxBlock;
           activeAuxBlocks.set(childId, auxBlock);
-          chainIds.push(auxBlock.chainid || child.coin.chainId);
+          chainIds.push(child.coin.chainId || auxBlock.chainid || 0);
         }
       } catch (err) {
         if (!err.message.includes('ECONNREFUSED') && !err.message.includes('downloading blocks')) {
@@ -544,7 +571,7 @@ class StratumServer extends EventEmitter {
     }
   }
 
-  handleConnection(socket, coinId, coin, portDifficulty) {
+  handleConnection(socket, coinId, coin, portDifficulty, fixedDiff) {
     const clientId = `${socket.remoteAddress}:${socket.remotePort}`;
     const client = {
       id: clientId,
@@ -571,6 +598,7 @@ class StratumServer extends EventEmitter {
 
     // Store the port starting difficulty as the floor for this client
     client.portDifficulty = portDifficulty || this.getDefaultDifficulty(coin.algorithm);
+    client.fixedDiff = fixedDiff || false;
 
     this.clients.set(clientId, client);
     console.log(`[Stratum] New connection: ${clientId} for ${coin.name}`);
@@ -610,7 +638,7 @@ class StratumServer extends EventEmitter {
     });
 
     socket.setKeepAlive(true);
-    socket.setTimeout(600000); // 10 min timeout
+    socket.setTimeout(1800000); // 30 min timeout - ASIC miners need longer
 
     socket.on('timeout', () => {
       console.log(`[Stratum] Client timeout: ${clientId}`);
@@ -774,12 +802,14 @@ class StratumServer extends EventEmitter {
 
       // Restore difficulty from previous session, but cap at 16x the starting difficulty
       // to avoid restoring an old high difficulty that causes reconnect loops
-      const maxRestoreDiff = client.difficulty * 16;
+      const maxRestoreDiff = client.difficulty * 4;
       if (existing.difficulty && existing.difficulty > client.difficulty && existing.difficulty <= maxRestoreDiff) {
         client.difficulty = existing.difficulty;
+        // Send difficulty change - but do NOT send a duplicate job here.
+        // The miner already received a job from handleSubscribe.
+        // Sending a second job during authorize confuses Antminer firmware and causes disconnects.
+        // The difficulty will take effect on the NEXT job (from broadcastJob or template poll).
         this.sendToClient(client, { id: null, method: 'mining.set_difficulty', params: [client.difficulty] });
-        // CRITICAL: Resend job after difficulty change so miner mines at correct difficulty
-        this.sendJob(client, false);
         console.log(`[Stratum] Restored difficulty ${client.difficulty.toFixed(2)} for ${client.workerName} on ${client.coin}`);
       }
     } else {
@@ -827,14 +857,14 @@ class StratumServer extends EventEmitter {
       if (client.shareTimestamps.length > 20) {
         client.shareTimestamps.shift();
       }
-      this.adjustDifficulty(client);
+      if (!client.fixedDiff) this.adjustDifficulty(client);
 
       db.prepare(
         'INSERT INTO shares (user_id, worker_id, coin, algorithm, difficulty, share_diff, is_valid, is_block) VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
       ).run(client.userId, client.workerId, client.coin, client.algorithm, client.difficulty, result.shareDiff, result.isBlock ? 1 : 0);
 
       db.prepare(
-        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, is_online = 1, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
+        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
       ).run(client.difficulty, result.shareDiff, client.workerId);
 
       if (result.isBlock) {
@@ -953,7 +983,7 @@ class StratumServer extends EventEmitter {
       const daemon = this.daemons.get(client.coin);
       const submitResult = await daemon.submitBlock(blockHex);
 
-      if (submitResult === null || submitResult === undefined || submitResult === '') {
+      if (submitResult === null || submitResult === undefined || submitResult === '' || submitResult === 'inconclusive') {
         // Success - null/empty means accepted
         console.log(`[Stratum] Block ACCEPTED by ${coin.name} daemon!`);
 
@@ -1261,7 +1291,7 @@ class StratumServer extends EventEmitter {
       let adjustRatio;
       if (isFastRamp) {
         // Direct jump to target ratio, clamped to 16x
-        adjustRatio = Math.max(0.0625, Math.min(16, ratio));
+        adjustRatio = Math.max(0.25, Math.min(4, ratio));
       } else {
         // Smooth: move 50% toward target, max 2x
         adjustRatio = 1 + (ratio - 1) * 0.5;
@@ -1281,7 +1311,7 @@ class StratumServer extends EventEmitter {
 
       // Algorithm-specific upper bounds
       const maxBounds = { sha256: 1e15, scrypt: 1e12 };
-      newDifficulty = Math.min(client.algorithm === 'scrypt' ? 1048576 : (maxBounds[client.algorithm] || 1e15), newDifficulty);
+      newDifficulty = Math.min(maxBounds[client.algorithm] || 1e15, newDifficulty);
 
       // Round to avoid floating point noise
       newDifficulty = Math.round(newDifficulty * 100) / 100;
@@ -1352,14 +1382,10 @@ class StratumServer extends EventEmitter {
       }
 
       const header = buildHeaderYiimp(versionHex, job.prevHashStratum, merkleRoot, nTime, job.nbits, nonce);
-      if (header.length !== 80) {
-        console.error(`[MergeMining] Parent header wrong length: ${header.length} (expected 80)`);
-        return;
-      }
 
-      // Use stratum merkle branches directly as coinbase merkle branch
-      // (computeCoinbaseMerkleBranch had byte-order bug mixing internal/display order txids)
-      const coinbaseMerkleBranch = job.merkleBranches.map(h => Buffer.from(h, 'hex'));
+      // Compute coinbase merkle branch (path from coinbase to parent merkle root)
+      const txHashes = job.template.transactions.map(tx => tx.txid || tx.hash);
+      const coinbaseMerkleBranch = auxpow.computeCoinbaseMerkleBranch(coinbaseHash, txHashes);
 
       // Get aux merkle branch for this specific chain
       const auxBranchData = job.auxData.branches.get(auxCoinId);
@@ -1386,7 +1412,7 @@ class StratumServer extends EventEmitter {
         submitResult = await child.daemon.submitAuxBlock(auxBlock.hash, proofHex);
       }
 
-      if (submitResult === true || submitResult === null || submitResult === undefined || submitResult === '') {
+      if (submitResult === true || submitResult === null || submitResult === undefined || submitResult === '' || false) {
         console.log(`[MergeMining] Aux block ACCEPTED by ${auxCoin.symbol} daemon! height=${auxBlock.height}`);
 
         // Record the block in the database

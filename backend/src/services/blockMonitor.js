@@ -66,7 +66,7 @@ class BlockMonitor {
     // Check sync progress
     const verificationProgress = info.verificationprogress || 1;
     status.syncProgress = Math.min(verificationProgress * 100, 100);
-    status.syncing = verificationProgress < 0.9999;
+    status.syncing = info.initialblockdownload !== false && verificationProgress < 0.9999;
 
     const blockHeight = info.blocks || info.headers || 0;
     status.blockHeight = blockHeight;

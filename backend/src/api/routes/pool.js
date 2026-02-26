@@ -132,9 +132,11 @@ router.get('/blocks', (req, res) => {
 
   const blocks = db.prepare(query).all(...params, parseInt(limit), parseInt(offset));
   const { total } = db.prepare(countQuery).get(...params);
+  const coins = db.prepare('SELECT DISTINCT coin FROM blocks ORDER BY coin').all().map(r => r.coin);
 
   res.json({
     blocks,
+    coins,
     pagination: {
       page: parseInt(page),
       limit: parseInt(limit),

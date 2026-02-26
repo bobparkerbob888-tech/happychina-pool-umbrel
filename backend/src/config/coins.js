@@ -9,10 +9,9 @@ const coins = {
     symbol: 'LTC',
     algorithm: 'scrypt',
     stratumPort: 3333,
-    // Multiple difficulty ports - vardiff ramps up from starting diff
     stratumPorts: [
-      { port: 3333, diff: 1048576,  label: 'Auto-diff (all Scrypt miners, vardiff)' },
-      { port: 3344, diff: 8,    label: 'Low Diff (CPU/GPU miners)' }
+      { port: 3333, diff: 65536, fixedDiff: true, label: 'Fixed Diff 64K (ASIC miners)' },
+      { port: 3344, diff: 8, label: 'Low Diff (CPU/GPU miners)' }
     ],
     reward: 6.25,
     blockTime: 150,
@@ -98,7 +97,7 @@ const coins = {
     blockTime: 60,
     confirmations: 100,
     mergeMinedWith: 'litecoin',
-    chainId: 0,
+    chainId: 7,
     auxpowApi: 'createauxblock',
     daemon: {
       host: process.env.LKY_RPC_HOST || '127.0.0.1',
