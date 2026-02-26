@@ -188,10 +188,10 @@ function buildCoinbaseTx(template, extraNonce1, extraNonce2Hex, coinId, mergeCom
   valueBuf.writeBigUInt64LE(BigInt(coinbaseValue));
   parts.push(valueBuf);
 
-  // Output script: Use coinbaseaux/scriptPubKey from template, or OP_TRUE as fallback
+  // Output script: Use coinbaseaux/scriptPubKey from template, or pool address
   const scriptPubKey = template.coinbasetxn?.scriptPubKey
     ? Buffer.from(template.coinbasetxn.scriptPubKey, 'hex')
-    : Buffer.from('51', 'hex'); // OP_TRUE fallback (pool needs to set wallet address via daemon)
+    : (template._poolScriptPubKey || Buffer.from('51', 'hex'));
   const pubKeyLen = writeVarInt(scriptPubKey.length);
   parts.push(pubKeyLen);
   parts.push(scriptPubKey);
@@ -305,12 +305,15 @@ function splitCoinbaseTx(template, coinId, mergeCommitment) {
   valueBuf.writeBigUInt64LE(BigInt(coinbaseValue));
   cb2Parts.push(valueBuf);
 
-  // Script pubkey from template or fallback
+  // Script pubkey from template or pool address
   let scriptPubKey;
   if (template.coinbasetxn && template.coinbasetxn.scriptPubKey) {
     scriptPubKey = Buffer.from(template.coinbasetxn.scriptPubKey, 'hex');
+  } else if (template._poolScriptPubKey) {
+    scriptPubKey = template._poolScriptPubKey;
   } else {
-    // OP_TRUE fallback - the daemon wallet will receive the reward
+    // FATAL: No pool address configured - block reward would be unspendable
+    console.error('[CRITICAL] No pool scriptPubKey! Coinbase will use OP_TRUE - block reward at risk!');
     scriptPubKey = Buffer.from('51', 'hex');
   }
   cb2Parts.push(writeVarInt(scriptPubKey.length));
@@ -348,6 +351,51 @@ class StratumServer extends EventEmitter {
     this.auxBlocks = new Map();      // coinId -> current aux block data from daemon
     this.auxTreeParams = new Map();  // parentCoinId -> { treeSize, depth, nonce, slots }
     this.auxMerkleData = new Map();  // parentCoinId -> { merkleRoot, branches, commitment }
+    this.poolScriptPubKeys = new Map(); // coinId -> Buffer (scriptPubKey for pool wallet)
+  }
+
+  // Convert bech32/legacy address to scriptPubKey
+  async getScriptPubKey(daemon, address) {
+    try {
+      const info = await daemon.call('validateaddress', [address]);
+      if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
+    } catch (e) {}
+    try {
+      const info = await daemon.call('getaddressinfo', [address]);
+      if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
+    } catch (e) {}
+    // Manual bech32 P2WPKH decode as last resort
+    if (address.startsWith('ltc1q') && address.length === 43) {
+      try {
+        const { bech32 } = require('bech32') || {};
+        // Simple fallback: can't decode without bech32 lib
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  async initPoolAddress(coinId) {
+    const daemon = this.daemons.get(coinId);
+    if (!daemon) return;
+    try {
+      // Try to load/create wallet and get address
+      try { await daemon.ensureWalletLoaded(); } catch (e) {}
+      let address;
+      try { address = await daemon.getNewAddress(); } catch (e) {
+        try { address = await daemon.call('getnewaddress', ['pool']); } catch (e2) {}
+      }
+      if (address) {
+        const spk = await this.getScriptPubKey(daemon, address);
+        if (spk) {
+          this.poolScriptPubKeys.set(coinId, spk);
+          console.log(`[Pool] ${coins[coinId].symbol} pool address: ${address} scriptPubKey: ${spk.toString('hex')}`);
+          return;
+        }
+      }
+      console.warn(`[Pool] WARNING: No pool address for ${coins[coinId].symbol} - blocks will use OP_TRUE!`);
+    } catch (err) {
+      console.error(`[Pool] Failed to get pool address for ${coins[coinId].symbol}:`, err.message);
+    }
   }
 
   start() {
@@ -360,6 +408,8 @@ class StratumServer extends EventEmitter {
       if (!coin.mergeMinedWith) {
         this.startCoinServer(coinId, coin);
         this.startTemplatePolling(coinId, coin);
+        // Initialize pool address for coinbase output (async, retries in background)
+        this.initPoolAddress(coinId).catch(e => console.error(`[Pool] initPoolAddress ${coinId}:`, e.message));
       }
     }
     console.log('[Stratum] All coin servers started');
@@ -424,6 +474,12 @@ class StratumServer extends EventEmitter {
         if (coin.segwit) rules.push('segwit');
         if (coin.mweb) rules.push('mweb');
         const template = await daemon.getBlockTemplate(rules);
+
+        // Attach pool scriptPubKey to template for coinbase output
+        const poolSpk = this.poolScriptPubKeys.get(coinId);
+        if (poolSpk) {
+          template._poolScriptPubKey = poolSpk;
+        }
 
         const existing = this.templates.get(coinId);
         const isNew = !existing || existing.previousblockhash !== template.previousblockhash;

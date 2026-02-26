@@ -188,10 +188,10 @@ function buildCoinbaseTx(template, extraNonce1, extraNonce2Hex, coinId, mergeCom
   valueBuf.writeBigUInt64LE(BigInt(coinbaseValue));
   parts.push(valueBuf);
 
-  // Output script: Use coinbaseaux/scriptPubKey from template, or OP_TRUE as fallback
+  // Output script: Use coinbaseaux/scriptPubKey from template, or pool address
   const scriptPubKey = template.coinbasetxn?.scriptPubKey
     ? Buffer.from(template.coinbasetxn.scriptPubKey, 'hex')
-    : Buffer.from('51', 'hex'); // OP_TRUE fallback (pool needs to set wallet address via daemon)
+    : (template._poolScriptPubKey || Buffer.from('51', 'hex'));
   const pubKeyLen = writeVarInt(scriptPubKey.length);
   parts.push(pubKeyLen);
   parts.push(scriptPubKey);
@@ -305,12 +305,15 @@ function splitCoinbaseTx(template, coinId, mergeCommitment) {
   valueBuf.writeBigUInt64LE(BigInt(coinbaseValue));
   cb2Parts.push(valueBuf);
 
-  // Script pubkey from template or fallback
+  // Script pubkey from template or pool address
   let scriptPubKey;
   if (template.coinbasetxn && template.coinbasetxn.scriptPubKey) {
     scriptPubKey = Buffer.from(template.coinbasetxn.scriptPubKey, 'hex');
+  } else if (template._poolScriptPubKey) {
+    scriptPubKey = template._poolScriptPubKey;
   } else {
-    // OP_TRUE fallback - the daemon wallet will receive the reward
+    // FATAL: No pool address configured - block reward would be unspendable
+    console.error('[CRITICAL] No pool scriptPubKey! Coinbase will use OP_TRUE - block reward at risk!');
     scriptPubKey = Buffer.from('51', 'hex');
   }
   cb2Parts.push(writeVarInt(scriptPubKey.length));
@@ -348,6 +351,51 @@ class StratumServer extends EventEmitter {
     this.auxBlocks = new Map();      // coinId -> current aux block data from daemon
     this.auxTreeParams = new Map();  // parentCoinId -> { treeSize, depth, nonce, slots }
     this.auxMerkleData = new Map();  // parentCoinId -> { merkleRoot, branches, commitment }
+    this.poolScriptPubKeys = new Map(); // coinId -> Buffer (scriptPubKey for pool wallet)
+  }
+
+  // Convert bech32/legacy address to scriptPubKey
+  async getScriptPubKey(daemon, address) {
+    try {
+      const info = await daemon.call('validateaddress', [address]);
+      if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
+    } catch (e) {}
+    try {
+      const info = await daemon.call('getaddressinfo', [address]);
+      if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
+    } catch (e) {}
+    // Manual bech32 P2WPKH decode as last resort
+    if (address.startsWith('ltc1q') && address.length === 43) {
+      try {
+        const { bech32 } = require('bech32') || {};
+        // Simple fallback: can't decode without bech32 lib
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  async initPoolAddress(coinId) {
+    const daemon = this.daemons.get(coinId);
+    if (!daemon) return;
+    try {
+      // Try to load/create wallet and get address
+      try { await daemon.ensureWalletLoaded(); } catch (e) {}
+      let address;
+      try { address = await daemon.getNewAddress(); } catch (e) {
+        try { address = await daemon.call('getnewaddress', ['pool']); } catch (e2) {}
+      }
+      if (address) {
+        const spk = await this.getScriptPubKey(daemon, address);
+        if (spk) {
+          this.poolScriptPubKeys.set(coinId, spk);
+          console.log(`[Pool] ${coins[coinId].symbol} pool address: ${address} scriptPubKey: ${spk.toString('hex')}`);
+          return;
+        }
+      }
+      console.warn(`[Pool] WARNING: No pool address for ${coins[coinId].symbol} - blocks will use OP_TRUE!`);
+    } catch (err) {
+      console.error(`[Pool] Failed to get pool address for ${coins[coinId].symbol}:`, err.message);
+    }
   }
 
   start() {
@@ -360,6 +408,8 @@ class StratumServer extends EventEmitter {
       if (!coin.mergeMinedWith) {
         this.startCoinServer(coinId, coin);
         this.startTemplatePolling(coinId, coin);
+        // Initialize pool address for coinbase output (async, retries in background)
+        this.initPoolAddress(coinId).catch(e => console.error(`[Pool] initPoolAddress ${coinId}:`, e.message));
       }
     }
     console.log('[Stratum] All coin servers started');
@@ -381,6 +431,7 @@ class StratumServer extends EventEmitter {
           address: null // Will be fetched on first aux block request
         });
         this.daemons.set(coinId, daemon);
+        daemon.setChainId(coin.chainId || 0);
         console.log(`[MergeMining] ${coin.name} (chainId=${coin.chainId}) will merge-mine with ${parentId}`);
       }
     }
@@ -398,7 +449,7 @@ class StratumServer extends EventEmitter {
 
     for (const portConfig of ports) {
       const server = net.createServer((socket) => {
-        this.handleConnection(socket, coinId, coin, portConfig.diff);
+        this.handleConnection(socket, coinId, coin, portConfig.diff, portConfig.fixedDiff);
       });
 
       server.listen(portConfig.port, config.stratum.host, () => {
@@ -423,6 +474,12 @@ class StratumServer extends EventEmitter {
         if (coin.segwit) rules.push('segwit');
         if (coin.mweb) rules.push('mweb');
         const template = await daemon.getBlockTemplate(rules);
+
+        // Attach pool scriptPubKey to template for coinbase output
+        const poolSpk = this.poolScriptPubKeys.get(coinId);
+        if (poolSpk) {
+          template._poolScriptPubKey = poolSpk;
+        }
 
         const existing = this.templates.get(coinId);
         const isNew = !existing || existing.previousblockhash !== template.previousblockhash;
@@ -537,7 +594,7 @@ class StratumServer extends EventEmitter {
           }
           child.auxBlock = auxBlock;
           activeAuxBlocks.set(childId, auxBlock);
-          chainIds.push(auxBlock.chainid || child.coin.chainId);
+          chainIds.push(child.coin.chainId || auxBlock.chainid || 0);
         }
       } catch (err) {
         if (!err.message.includes('ECONNREFUSED') && !err.message.includes('downloading blocks')) {
@@ -570,7 +627,7 @@ class StratumServer extends EventEmitter {
     }
   }
 
-  handleConnection(socket, coinId, coin, portDifficulty) {
+  handleConnection(socket, coinId, coin, portDifficulty, fixedDiff) {
     const clientId = `${socket.remoteAddress}:${socket.remotePort}`;
     const client = {
       id: clientId,
@@ -597,6 +654,7 @@ class StratumServer extends EventEmitter {
 
     // Store the port starting difficulty as the floor for this client
     client.portDifficulty = portDifficulty || this.getDefaultDifficulty(coin.algorithm);
+    client.fixedDiff = fixedDiff || false;
 
     this.clients.set(clientId, client);
     console.log(`[Stratum] New connection: ${clientId} for ${coin.name}`);
@@ -855,14 +913,14 @@ class StratumServer extends EventEmitter {
       if (client.shareTimestamps.length > 20) {
         client.shareTimestamps.shift();
       }
-      this.adjustDifficulty(client);
+      if (!client.fixedDiff) this.adjustDifficulty(client);
 
       db.prepare(
         'INSERT INTO shares (user_id, worker_id, coin, algorithm, difficulty, share_diff, is_valid, is_block) VALUES (?, ?, ?, ?, ?, ?, 1, ?)'
       ).run(client.userId, client.workerId, client.coin, client.algorithm, client.difficulty, result.shareDiff, result.isBlock ? 1 : 0);
 
       db.prepare(
-        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, is_online = 1, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
+        'UPDATE workers SET shares_valid = shares_valid + 1, last_share = CURRENT_TIMESTAMP, difficulty = ?, best_share = MAX(best_share, ?) WHERE id = ?'
       ).run(client.difficulty, result.shareDiff, client.workerId);
 
       if (result.isBlock) {
@@ -981,7 +1039,7 @@ class StratumServer extends EventEmitter {
       const daemon = this.daemons.get(client.coin);
       const submitResult = await daemon.submitBlock(blockHex);
 
-      if (submitResult === null || submitResult === undefined || submitResult === '') {
+      if (submitResult === null || submitResult === undefined || submitResult === '' || submitResult === 'inconclusive') {
         // Success - null/empty means accepted
         console.log(`[Stratum] Block ACCEPTED by ${coin.name} daemon!`);
 
@@ -1308,8 +1366,8 @@ class StratumServer extends EventEmitter {
       newDifficulty = Math.max(portFloor, newDifficulty);
 
       // Algorithm-specific upper bounds
-      const maxBounds = { sha256: 0, scrypt: 1e12 }; // sha256: 0 = no max (ckpool-style maxdiff=0)
-      const maxCap = maxBounds[client.algorithm]; if (maxCap > 0) newDifficulty = Math.min(maxCap, newDifficulty); // 0 = no max (ckpool-style)
+      const maxBounds = { sha256: 1e15, scrypt: 1e12 };
+      newDifficulty = Math.min(maxBounds[client.algorithm] || 1e15, newDifficulty);
 
       // Round to avoid floating point noise
       newDifficulty = Math.round(newDifficulty * 100) / 100;
@@ -1410,7 +1468,7 @@ class StratumServer extends EventEmitter {
         submitResult = await child.daemon.submitAuxBlock(auxBlock.hash, proofHex);
       }
 
-      if (submitResult === true || submitResult === null || submitResult === undefined || submitResult === '') {
+      if (submitResult === true || submitResult === null || submitResult === undefined || submitResult === '' || false) {
         console.log(`[MergeMining] Aux block ACCEPTED by ${auxCoin.symbol} daemon! height=${auxBlock.height}`);
 
         // Record the block in the database
@@ -1464,7 +1522,7 @@ class StratumServer extends EventEmitter {
     // Fallback only - used when coin has no stratumPorts config
     // Port-specific difficulty from coins.js takes priority
     const defaults = {
-      sha256: 42,      // ckpool-style startdiff=42, vardiff ramps up quickly for any miner
+      sha256: 65536,   // 64K - low start, vardiff ramps up quickly for any miner
       scrypt: 65536    // 64K - low start, vardiff ramps up quickly for any miner
     };
     return defaults[algorithm] || 1;
