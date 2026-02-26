@@ -45,9 +45,8 @@ function Workers() {
     const coinInfo = poolInfo.coins?.[coinId];
     if (!coinInfo?.network?.difficulty) return 'N/A';
     const netDiff = coinInfo.network.difficulty;
-    const algo = coinWorkers[0]?.algorithm;
-    const multiplier = algo === 'scrypt' ? Math.pow(2, 16) : Math.pow(2, 32);
-    return formatTTF((netDiff * multiplier) / coinHashrate);
+    // TTF = netDiff * 2^32 / hashrate (same formula for all algorithms)
+    return formatTTF((netDiff * Math.pow(2, 32)) / coinHashrate);
   };
 
   // Per-coin hashrates
