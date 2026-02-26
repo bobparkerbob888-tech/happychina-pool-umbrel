@@ -1281,7 +1281,7 @@ class StratumServer extends EventEmitter {
 
       // Algorithm-specific upper bounds
       const maxBounds = { sha256: 1e15, scrypt: 1e12 };
-      newDifficulty = Math.min(maxBounds[client.algorithm] || 1e15, newDifficulty);
+      newDifficulty = Math.min(client.algorithm === 'scrypt' ? 1048576 : (maxBounds[client.algorithm] || 1e15), newDifficulty);
 
       // Round to avoid floating point noise
       newDifficulty = Math.round(newDifficulty * 100) / 100;
