@@ -1012,10 +1012,8 @@ class StratumServer extends EventEmitter {
 
       const hashReversed = Buffer.from(hashBuffer).reverse();
       const hashBig = BigInt('0x' + hashReversed.toString('hex'));
-      // Use algorithm-appropriate max target for shareDiff
-      // SHA256 base for Bitcoin, Scrypt base for Litecoin/alts - must match getdifficulty scale
-      const maxTargetForDiff = job.algorithm === 'scrypt' ? MAX_TARGET_SCRYPT : MAX_TARGET_SHA256;
-      const shareDiff = hashBig > 0n ? Number(maxTargetForDiff / hashBig) : 0;
+      // shareDiff: getdifficulty uses SHA256 base for ALL coins (Bitcoin GetDifficulty formula)
+      const shareDiff = hashBig > 0n ? Number(MAX_TARGET_SHA256 / hashBig) : 0;
 
       const shareTarget = difficultyToTarget(client.difficulty, job.algorithm);
       const meetsShareTarget = hashMeetsTarget(hashReversed, shareTarget);
