@@ -6,7 +6,31 @@
 const http = require('http');
 
 const PROJECT = process.env.DOCKER_PROJECT || 'happychina-pool';
-const NETWORK = `${PROJECT}_default`;
+let NETWORK = null; // Auto-detected on first use
+
+// Auto-detect the Docker network by inspecting our own container
+async function getNetwork() {
+  if (NETWORK) return NETWORK;
+  try {
+    // Find our backend container and get its network
+    const hostname = require('os').hostname();
+    const res = await dockerRequest('GET', `/containers/${hostname}/json`);
+    if (res.statusCode === 200 && res.data && res.data.NetworkSettings) {
+      const networks = Object.keys(res.data.NetworkSettings.Networks);
+      if (networks.length > 0) {
+        NETWORK = networks[0];
+        console.log(`[Docker] Auto-detected network: ${NETWORK}`);
+        return NETWORK;
+      }
+    }
+  } catch (err) {
+    console.error('[Docker] Failed to auto-detect network:', err.message);
+  }
+  // Fallback
+  NETWORK = 'umbrel_main_network';
+  console.log(`[Docker] Using fallback network: ${NETWORK}`);
+  return NETWORK;
+}
 
 // Coin daemon container configurations (real images from VPS)
 const DAEMON_CONFIGS = {
@@ -149,6 +173,9 @@ async function startCoinDaemon(coinId) {
   // Pull image first
   await pullImage(cfg.image);
 
+  // Auto-detect network
+  const network = await getNetwork();
+
   // Create the container
   const containerName = `${PROJECT}_${cfg.service}_1`;
   const volumeName = `${PROJECT}_${coinId}-data`;
@@ -159,11 +186,11 @@ async function startCoinDaemon(coinId) {
     HostConfig: {
       Binds: [`${volumeName}:${cfg.dataDir}`],
       RestartPolicy: { Name: 'on-failure', MaximumRetryCount: 5 },
-      NetworkMode: NETWORK
+      NetworkMode: network
     },
     NetworkingConfig: {
       EndpointsConfig: {
-        [NETWORK]: {
+        [network]: {
           Aliases: [cfg.service]
         }
       }
