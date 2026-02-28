@@ -89,26 +89,6 @@ const coins = {
     explorer: '',
     addressPrefixes: ['B']
   },
-  luckycoin: {
-    name: 'Luckycoin',
-    symbol: 'LKY',
-    algorithm: 'scrypt',
-    stratumPort: 3337,
-    reward: 0,
-    blockTime: 60,
-    confirmations: 2,
-    mergeMinedWith: 'litecoin',
-    chainId: 777,
-    auxpowApi: 'createauxblock',
-    daemon: {
-      host: process.env.LKY_RPC_HOST || '127.0.0.1',
-      port: parseInt(process.env.LKY_RPC_PORT) || 9918,
-      user: process.env.LKY_RPC_USER || 'rpcuser',
-      pass: process.env.LKY_RPC_PASS || 'rpcuser'
-    },
-    explorer: '',
-    addressPrefixes: ['L']
-  },
   junkcoin: {
     name: 'Junkcoin',
     symbol: 'JKC',
