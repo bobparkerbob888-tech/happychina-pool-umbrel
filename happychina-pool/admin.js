@@ -179,7 +179,6 @@ router.put('/settings', (req, res) => {
 router.get('/coins', (req, res) => {
   const coinSettings = {};
   for (const [coinId, coin] of Object.entries(coins)) {
-    const pruned = getSetting(`coin_${coinId}_pruned`, 'false');
     const enabled = getSetting(`coin_${coinId}_enabled`, 'false');
     coinSettings[coinId] = {
       name: coin.name,
@@ -187,7 +186,6 @@ router.get('/coins', (req, res) => {
       algorithm: coin.algorithm,
       stratumPort: coin.mergeMinedWith ? coins[coin.mergeMinedWith].stratumPort : coin.stratumPort,
       mergeMinedWith: coin.mergeMinedWith || null,
-      pruned: pruned === 'true',
       enabled: enabled === 'true'
     };
   }
@@ -199,13 +197,12 @@ router.put('/coins/:coinId', async (req, res) => {
   const { coinId } = req.params;
   if (!coins[coinId]) return res.status(404).json({ error: 'Coin not found' });
 
-  const { pruned, enabled } = req.body;
+  const { enabled } = req.body;
   const upsert = db.prepare(`
     INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
   `);
 
-  if (pruned !== undefined) upsert.run(`coin_${coinId}_pruned`, String(pruned));
   if (enabled !== undefined) {
     upsert.run(`coin_${coinId}_enabled`, String(enabled));
 
