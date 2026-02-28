@@ -71,7 +71,7 @@ function findTreeParams(chainIds) {
 
   for (let depth = 1; depth <= 16; depth++) {
     const treeSize = 1 << depth;
-    for (let nonce = 0; nonce < 1000; nonce++) {
+    for (let nonce = 0; nonce < 100000; nonce++) {
       const slots = new Map();
       let collision = false;
       for (const chainId of chainIds) {
@@ -181,7 +181,9 @@ function buildAuxMerkleTree(auxBlocks, treeParams) {
 function buildMergeCommitment(auxMerkleRoot, treeSize, nonce) {
   const buf = Buffer.alloc(44);
   MERGE_MINING_MAGIC.copy(buf, 0);       // 4 bytes magic
-  auxMerkleRoot.copy(buf, 4);             // 32 bytes merkle root
+  // Daemon reverses computed root before searching coinbase, so store in big-endian
+  const reversedRoot = Buffer.from(auxMerkleRoot).reverse();
+  reversedRoot.copy(buf, 4);             // 32 bytes merkle root
   buf.writeUInt32LE(treeSize, 36);        // 4 bytes tree size
   buf.writeUInt32LE(nonce, 40);           // 4 bytes nonce
   return buf;

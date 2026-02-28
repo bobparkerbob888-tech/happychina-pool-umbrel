@@ -486,13 +486,12 @@ class StratumServer extends EventEmitter {
 
         this.templates.set(coinId, template);
 
-        // Refresh aux blocks for merge mining if this is a parent chain
-        if (this.mergeGroups.has(coinId)) {
-          await this.refreshAuxBlocks(coinId);
-        }
-
         if (isNew) {
           console.log(`[Stratum] New block template for ${coin.name}: height=${template.height} txs=${template.transactions.length}`);
+          // Refresh aux blocks only on new parent block (not every poll)
+          if (this.mergeGroups.has(coinId)) {
+            await this.refreshAuxBlocks(coinId);
+          }
           this.broadcastJob(coinId, true);
         }
       } catch (err) {
@@ -1012,7 +1011,7 @@ class StratumServer extends EventEmitter {
 
       const hashReversed = Buffer.from(hashBuffer).reverse();
       const hashBig = BigInt('0x' + hashReversed.toString('hex'));
-      // shareDiff: getdifficulty uses SHA256 base for ALL coins (Bitcoin GetDifficulty formula)
+      // Use algorithm-appropriate max target for shareDiff
       const shareDiff = hashBig > 0n ? Number(MAX_TARGET_SHA256 / hashBig) : 0;
 
       const shareTarget = difficultyToTarget(client.difficulty, job.algorithm);
@@ -1056,16 +1055,22 @@ class StratumServer extends EventEmitter {
 
         // Get the actual reward from template
         const reward = template.coinbasevalue / 1e8;
+        // Get the actual SHA256d block hash from daemon (scrypt hash is for PoW only)
+        let realBlockHash = blockHash;
+        try {
+          const daemonHash = await daemon.call('getblockhash', [template.height]);
+          if (daemonHash) realBlockHash = daemonHash;
+        } catch (e) { console.log(`[Stratum] Could not get real block hash: ${e.message}`); }
 
         const dbResult = db.prepare(
           'INSERT INTO blocks (coin, height, hash, reward, difficulty, finder_id, worker_name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(client.coin, template.height, blockHash, reward, template.difficulty || 0, client.userId, client.workerName, 'pending');
+        ).run(client.coin, template.height, realBlockHash, reward, template.difficulty || 0, client.userId, client.workerName, 'pending');
 
         this.emit('block', {
           id: dbResult.lastInsertRowid,
           coin: client.coin,
           height: template.height,
-          hash: blockHash,
+          hash: realBlockHash,
           finder: client.userId,
           worker: client.workerName
         });

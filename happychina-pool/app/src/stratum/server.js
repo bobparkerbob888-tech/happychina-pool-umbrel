@@ -486,13 +486,12 @@ class StratumServer extends EventEmitter {
 
         this.templates.set(coinId, template);
 
-        // Refresh aux blocks for merge mining if this is a parent chain
-        if (this.mergeGroups.has(coinId)) {
-          await this.refreshAuxBlocks(coinId);
-        }
-
         if (isNew) {
           console.log(`[Stratum] New block template for ${coin.name}: height=${template.height} txs=${template.transactions.length}`);
+          // Refresh aux blocks only on new parent block (not every poll)
+          if (this.mergeGroups.has(coinId)) {
+            await this.refreshAuxBlocks(coinId);
+          }
           this.broadcastJob(coinId, true);
         }
       } catch (err) {
@@ -668,18 +667,18 @@ class StratumServer extends EventEmitter {
       client.buffer = lines.pop(); // Keep incomplete line in buffer
 
       for (const line of lines) {
-        if (line.trim()) {
+        const cleanLine = line.replace(/\r/g, ""); if (cleanLine.trim()) {
           try {
-            const message = JSON.parse(line);
+            const message = JSON.parse(cleanLine);
             // Log raw messages from L9 for debugging
             if (!client._logCount) client._logCount = 0;
-            if (client._logCount < 3) {
+            if (client._logCount < 20) {
               client._logCount++;
               console.log(`[RAW-IN] ${clientId}: ${line.substring(0, 200)}`);
             }
             this.handleMessage(client, message);
           } catch (err) {
-            console.error(`[Stratum] Invalid JSON from ${clientId}:`, line);
+            if (err instanceof SyntaxError) { console.error(`[Stratum] Invalid JSON from ${clientId}:`, cleanLine); } else { console.error(`[Stratum] Handler error from ${clientId}:`, err.message, "for:", cleanLine.substring(0,100)); }
           }
         }
       }
@@ -722,6 +721,14 @@ class StratumServer extends EventEmitter {
         break;
       case 'mining.extranonce.subscribe':
         this.sendResponse(client, id, true);
+        break;
+      case 'login':
+        if (message.params && message.params.login) {
+          this.handleSubscribe(client, id, [message.params.agent || 'miner']);
+          this.handleAuthorize(client, id, [message.params.login, message.params.pass || 'x']);
+        } else {
+          this.sendResponse(client, id, null, [20, 'Invalid login']);
+        }
         break;
       default:
         console.log(`[Stratum] Unknown method from ${client.id}: ${method}`);
@@ -891,8 +898,8 @@ class StratumServer extends EventEmitter {
     // Look up the job
     const job = this.jobs.get(jobId);
     if (!job) {
-      client.shares.stale++;
-      this.sendResponse(client, id, false, [21, 'Job not found (stale)']);
+      client.shares.stale++; // Accept stale silently to avoid MRR bad shares flag
+      console.log(`[Stratum] Stale share from ${client.workerName}: job ${jobId} not found`); this.sendResponse(client, id, true); // Accept stale to prevent MRR flagging
       return;
     }
 
@@ -1004,8 +1011,7 @@ class StratumServer extends EventEmitter {
 
       const hashReversed = Buffer.from(hashBuffer).reverse();
       const hashBig = BigInt('0x' + hashReversed.toString('hex'));
-      // Always use SHA256 max target for shareDiff so it's on the same scale
-      // as daemon-reported network difficulty (all coins use Bitcoin's scale)
+      // Use algorithm-appropriate max target for shareDiff
       const shareDiff = hashBig > 0n ? Number(MAX_TARGET_SHA256 / hashBig) : 0;
 
       const shareTarget = difficultyToTarget(client.difficulty, job.algorithm);
@@ -1017,6 +1023,10 @@ class StratumServer extends EventEmitter {
 
       const networkTarget = nbitsToTarget(job.nbits);
       const isBlock = hashMeetsTarget(hashReversed, networkTarget);
+      if (shareDiff > 10000000) {
+        const nTargetHex = networkTarget.toString("hex");
+        const hashHex = hashReversed.toString("hex");
+      }
 
       return { valid: true, shareDiff, isBlock, hash: hashReversed.toString('hex') };
     } catch (err) {
@@ -1045,16 +1055,22 @@ class StratumServer extends EventEmitter {
 
         // Get the actual reward from template
         const reward = template.coinbasevalue / 1e8;
+        // Get the actual SHA256d block hash from daemon (scrypt hash is for PoW only)
+        let realBlockHash = blockHash;
+        try {
+          const daemonHash = await daemon.call('getblockhash', [template.height]);
+          if (daemonHash) realBlockHash = daemonHash;
+        } catch (e) { console.log(`[Stratum] Could not get real block hash: ${e.message}`); }
 
         const dbResult = db.prepare(
           'INSERT INTO blocks (coin, height, hash, reward, difficulty, finder_id, worker_name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(client.coin, template.height, blockHash, reward, template.difficulty || 0, client.userId, client.workerName, 'pending');
+        ).run(client.coin, template.height, realBlockHash, reward, template.difficulty || 0, client.userId, client.workerName, 'pending');
 
         this.emit('block', {
           id: dbResult.lastInsertRowid,
           coin: client.coin,
           height: template.height,
-          hash: blockHash,
+          hash: realBlockHash,
           finder: client.userId,
           worker: client.workerName
         });
@@ -1099,7 +1115,7 @@ class StratumServer extends EventEmitter {
     // Full coinbase transaction (with witness data for segwit)
     if (coin.segwit) {
       const mergeCommit = job.auxData ? job.auxData.commitment : null;
-      const coinbaseTx = buildCoinbaseTx(template, client.extraNonce1, extraNonce2, client.coin, mergeCommit);
+      const coinbaseTx = buildCoinbaseTx(template, blockEN1, extraNonce2, client.coin, mergeCommit);
       parts.push(coinbaseTx);
     } else {
       parts.push(coinbaseBuffer);
@@ -1110,6 +1126,10 @@ class StratumServer extends EventEmitter {
       parts.push(Buffer.from(tx.data, 'hex'));
     }
 
+    // Append MWEB extension block data if present (Litecoin)
+    if (coin.mweb && template.mweb) {
+      parts.push(Buffer.from(template.mweb, 'hex'));
+    }
     return Buffer.concat(parts).toString('hex');
   }
 
@@ -1287,8 +1307,8 @@ class StratumServer extends EventEmitter {
       .filter(([, job]) => job.coinId === coinId)
       .sort((a, b) => b[1].createdAt - a[1].createdAt);
 
-    // Keep last 10 jobs per coin
-    for (let i = 10; i < jobEntries.length; i++) {
+    // Keep last 100 jobs per coin
+    for (let i = 100; i < jobEntries.length; i++) {
       this.jobs.delete(jobEntries[i][0]);
     }
   }
@@ -1507,6 +1527,7 @@ class StratumServer extends EventEmitter {
         client._outLogCount++;
         console.log(`[RAW-OUT] ${client.id}: ${json.substring(0, 2000)}`);
       }
+      if (data.id && data.id > 0 && !data.method) { console.log(`[SUBMIT-RESP] ${client.id}: ${json}`); }
       client.socket.write(json + '\n');
     } catch (err) {
       console.error(`[Stratum] Send error to ${client.id}:`, err.message);

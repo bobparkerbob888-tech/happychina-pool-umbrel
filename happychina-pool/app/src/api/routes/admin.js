@@ -3,6 +3,7 @@ const db = require('../../models/database');
 const config = require('../../config');
 const { authMiddleware, adminMiddleware } = require('../../middleware/auth');
 const { coins } = require('../../config/coins');
+const { startCoinDaemon, stopCoinDaemon, getCoinDaemonStatus } = require('../../services/dockerControl');
 
 const router = express.Router();
 
@@ -132,14 +133,13 @@ router.get('/settings', (req, res) => {
     pool_fee: parseFloat(getSetting('pool_fee', config.pool.fee)),
     payout_threshold: parseFloat(getSetting('payout_threshold', config.pool.payoutThreshold)),
     payout_interval: parseInt(getSetting('payout_interval', config.pool.payoutInterval)),
-    node_mode: getSetting('node_mode', process.env.NODE_MODE || 'full'),
     stratum_host: config.stratum.host
   });
 });
 
 // Update pool settings
 router.put('/settings', (req, res) => {
-  const { pool_name, pool_fee, payout_threshold, payout_interval, node_mode } = req.body;
+  const { pool_name, pool_fee, payout_threshold, payout_interval } = req.body;
 
   const upsert = db.prepare(`
     INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -169,18 +169,10 @@ router.put('/settings', (req, res) => {
       upsert.run('payout_interval', String(interval));
       config.pool.payoutInterval = interval;
     }
-    if (node_mode !== undefined) {
-      if (!['full', 'pruned'].includes(node_mode)) return res.status(400).json({ error: 'Node mode must be "full" or "pruned"' });
-      upsert.run('node_mode', node_mode);
-    }
   });
 
   transaction();
-
-  const restartNeeded = node_mode !== undefined;
-  res.json({ 
-    message: 'Settings updated' + (restartNeeded ? '. ⚠️ Node mode changed - restart the app from Umbrel dashboard for changes to take effect.' : '')
-  });
+  res.json({ message: 'Settings updated' });
 });
 
 // Get per-coin settings
@@ -188,12 +180,12 @@ router.get('/coins', (req, res) => {
   const coinSettings = {};
   for (const [coinId, coin] of Object.entries(coins)) {
     const pruned = getSetting(`coin_${coinId}_pruned`, 'false');
-    const enabled = getSetting(`coin_${coinId}_enabled`, 'true');
+    const enabled = getSetting(`coin_${coinId}_enabled`, 'false');
     coinSettings[coinId] = {
       name: coin.name,
       symbol: coin.symbol,
       algorithm: coin.algorithm,
-      stratumPort: coin.stratumPort,
+      stratumPort: coin.mergeMinedWith ? coins[coin.mergeMinedWith].stratumPort : coin.stratumPort,
       mergeMinedWith: coin.mergeMinedWith || null,
       pruned: pruned === 'true',
       enabled: enabled === 'true'
@@ -202,8 +194,8 @@ router.get('/coins', (req, res) => {
   res.json(coinSettings);
 });
 
-// Update per-coin settings
-router.put('/coins/:coinId', (req, res) => {
+// Update per-coin settings (enable/disable starts/stops daemon container)
+router.put('/coins/:coinId', async (req, res) => {
   const { coinId } = req.params;
   if (!coins[coinId]) return res.status(404).json({ error: 'Coin not found' });
 
@@ -214,9 +206,55 @@ router.put('/coins/:coinId', (req, res) => {
   `);
 
   if (pruned !== undefined) upsert.run(`coin_${coinId}_pruned`, String(pruned));
-  if (enabled !== undefined) upsert.run(`coin_${coinId}_enabled`, String(enabled));
+  if (enabled !== undefined) {
+    upsert.run(`coin_${coinId}_enabled`, String(enabled));
+
+    // Start or stop the daemon container
+    try {
+      if (enabled === true || enabled === 'true') {
+        const result = await startCoinDaemon(coinId);
+        console.log(`[Admin] Started daemon for ${coins[coinId].name}:`, result.action);
+        return res.json({ message: `${coins[coinId].name} enabled - daemon ${result.action}`, daemon: result });
+      } else {
+        const result = await stopCoinDaemon(coinId);
+        console.log(`[Admin] Stopped daemon for ${coins[coinId].name}:`, result.action);
+        return res.json({ message: `${coins[coinId].name} disabled - daemon ${result.action}`, daemon: result });
+      }
+    } catch (err) {
+      console.error(`[Admin] Docker control error for ${coinId}:`, err.message);
+      return res.json({ message: `${coins[coinId].name} settings updated (daemon control failed: ${err.message})`, error: err.message });
+    }
+  }
 
   res.json({ message: `${coins[coinId].name} settings updated` });
+});
+
+// Reset all coin settings to defaults (all disabled, not pruned)
+router.post('/coins/reset', (req, res) => {
+  const upsert = db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const transaction = db.transaction(() => {
+    for (const coinId of Object.keys(coins)) {
+      upsert.run(`coin_${coinId}_enabled`, 'false');
+      upsert.run(`coin_${coinId}_pruned`, 'false');
+    }
+  });
+
+  transaction();
+
+  // Stop all daemon containers
+  const stopPromises = Object.keys(coins).map(coinId =>
+    stopCoinDaemon(coinId).catch(err => console.error(`[Admin] Error stopping ${coinId}:`, err.message))
+  );
+
+  Promise.all(stopPromises).then(() => {
+    res.json({ message: 'All coin settings reset to defaults. All daemons stopped.' });
+  }).catch(() => {
+    res.json({ message: 'Settings reset. Some daemons may still be running.' });
+  });
 });
 
 // Get recent payments list
