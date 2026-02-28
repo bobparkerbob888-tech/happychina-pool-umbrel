@@ -7,13 +7,12 @@ services:
       APP_HOST: frontend
       APP_PORT: '80'
       PROXY_AUTH_ADD: 'false'
-      UMBREL_AUTH_SECRET: dummy_secret_for_testing
     volumes:
-      - /home/umbrel/umbrel/app-data/happychina-pool/umbrel-app.yml:/extra/umbrel-app.yml:ro
+      - ${APP_DATA_DIR:-.}/umbrel-app.yml:/extra/umbrel-app.yml:ro
 
   # === Backend API (Node.js + SQLite) ===
   backend:
-    build: ${APP_DATA_DIR:-.}/backend
+    image: ghcr.io/bobparkerbob888-tech/happychina-pool-backend:2.1.0
     restart: on-failure
     environment:
       PORT: '8080'
@@ -22,10 +21,6 @@ services:
       POOL_NAME: 'HappyChina Pool'
       POOL_FEE: '1.0'
       DB_PATH: /app/data/pool.db
-      BTC_RPC_HOST: bitcoind
-      BTC_RPC_PORT: '8332'
-      BTC_RPC_USER: umbrel
-      BTC_RPC_PASS: umbrel
       LTC_RPC_HOST: litecoind
       LTC_RPC_PORT: '9332'
       LTC_RPC_USER: umbrel
@@ -34,10 +29,6 @@ services:
       DOGE_RPC_PORT: '22555'
       DOGE_RPC_USER: umbrel
       DOGE_RPC_PASS: umbrel
-      NMC_RPC_HOST: namecoind
-      NMC_RPC_PORT: '8336'
-      NMC_RPC_USER: umbrel
-      NMC_RPC_PASS: umbrel
       PEPE_RPC_HOST: pepecoind
       PEPE_RPC_PORT: '29373'
       PEPE_RPC_USER: umbrel
@@ -54,7 +45,6 @@ services:
       JKC_RPC_PORT: '9772'
       JKC_RPC_USER: umbrel
       JKC_RPC_PASS: umbrel
-      JKC_PAYOUT_ADDRESS: 7TQhhf4zRpgKn8xCHJPkYJ7QWQVD32aMuq
       DINGO_RPC_HOST: dingocoind
       DINGO_RPC_PORT: '34646'
       DINGO_RPC_USER: umbrel
@@ -69,72 +59,39 @@ services:
       TRMP_RPC_PASS: umbrel
     volumes:
       - pool-data:/app/data
-      - ${APP_DATA_DIR:-.}/frontend/build:/frontend/build:ro
+      - frontend-build:/frontend/build:ro
     ports:
-      - '3333-3343:3333-3343'
+      - '3332-3344:3332-3344'
     expose:
       - '8080'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      litecoind:
+        condition: service_started
+
+  # === Init: copy frontend build files ===
+  init:
+    image: ghcr.io/bobparkerbob888-tech/happychina-pool-frontend:2.1.0
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Copying frontend build files..."
+        cp -r /usr/share/nginx/html/* /frontend-build/
+        echo "Init complete."
+    volumes:
+      - frontend-build:/frontend-build
 
   # === Frontend (React + Nginx) ===
   frontend:
-    ports:
-      - "8080:80"
-    build: ${APP_DATA_DIR:-.}/frontend
+    image: ghcr.io/bobparkerbob888-tech/happychina-pool-frontend:2.1.0
     restart: on-failure
     depends_on:
       - backend
     expose:
       - '80'
 
-  # === Coin Daemons ===
-  bitcoind:
-    image: lncm/bitcoind:v27.2
-    restart: on-failure
-    stop_grace_period: 15m
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/bitcoin:/data/.bitcoin
-    command:
-      - '-server=1'
-      - '-rpcuser=umbrel'
-      - '-rpcpassword=umbrel'
-      - '-rpcallowip=0.0.0.0/0'
-      - '-rpcbind=0.0.0.0'
-      - '-rpcport=8332'
-      - '-port=8333'
-      - '-txindex=1'
-      - '-printtoconsole'
-      - '-dbcache=8192'
-      - '-maxconnections=64'
-      - '-par=0'
-      - '-maxmempool=300'
-      - '-rpcworkqueue=128'
-      - '-rpcthreads=8'
-    ports:
-      - '8332:8332'
-      - '8333:8333'
-
-  namecoind:
-    image: sevenrats/namecoin-core:latest
-    restart: on-failure
-    stop_grace_period: 15m
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/namecoin:/home/namecoin/.namecoin
-    command:
-      - namecoind
-      - '-server=1'
-      - '-rpcuser=umbrel'
-      - '-rpcpassword=umbrel'
-      - '-rpcallowip=0.0.0.0/0'
-      - '-rpcbind=0.0.0.0'
-      - '-rpcport=8336'
-      - '-port=8334'
-      - '-txindex=1'
-      - '-printtoconsole'
-      - '-dbcache=512'
-      - '-maxconnections=64'
-    ports:
-      - '8336:8336'
-
+  # === Coin Daemons (Scrypt only - 9 coins) ===
   litecoind:
     image: uphold/litecoin-core:0.21
     restart: on-failure
@@ -144,8 +101,6 @@ services:
     command:
       - litecoind
       - '-server=1'
-      - -rpcworkqueue=128
-      - -rpcthreads=8
       - '-rpcuser=umbrel'
       - '-rpcpassword=umbrel'
       - '-rpcallowip=0.0.0.0/0'
@@ -154,31 +109,18 @@ services:
       - '-port=9333'
       - '-txindex=1'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '9332:9332'
       - '9333:9333'
 
-  litecoind-peer:
-    image: uphold/litecoin-core:0.21
-    restart: on-failure
-    command:
-      - litecoind
-      - "-port=19333"
-      - "-addnode=litecoind:9333"
-      - "-printtoconsole"
-      - "-maxconnections=64"
-      - "-listen=1"
-    volumes:
-      - ${APP_DATA_DIR:-.}/data/litecoin-peer:/home/litecoin/.litecoin
   dogecoind:
-    image: casperstack/dogecoin:latest
+    image: btcpayserver/dogecoin:1.14.9-amd64
     restart: on-failure
     stop_grace_period: 15m
     volumes:
-      - ${APP_DATA_DIR:-.}/data/dogecoin:/root/.dogecoin
+      - ${APP_DATA_DIR:-.}/data/dogecoin:/home/dogecoin/.dogecoin
     command:
       - dogecoind
       - '-server=1'
@@ -194,7 +136,7 @@ services:
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '22555:22555'
+      - '22556:22556'
 
   pepecoind:
     image: pepeenthusiast/pepecoin-core:latest
@@ -212,14 +154,14 @@ services:
       - '-rpcport=29373'
       - '-port=29374'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-par=0'
       - '-maxconnections=64'
     ports:
-      - '29373:29373'
+      - '29374:29374'
 
   bellsd:
-    image: bellscoin:3.0
+    image: ghcr.io/bobparkerbob888-tech/bellscoin:3.0
     restart: on-failure
     stop_grace_period: 15m
     volumes:
@@ -233,11 +175,10 @@ services:
       - '-rpcport=19918'
       - '-port=19919'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '19918:19918'
       - '19919:19919'
 
   luckycoind:
@@ -261,7 +202,6 @@ services:
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '9918:9918'
       - '9917:9917'
 
   junkcoind:
@@ -280,15 +220,14 @@ services:
       - '-rpcport=9772'
       - '-port=9771'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '9772:9772'
       - '9771:9771'
 
   dingocoind:
-    image: dingocoin:v1.18.0.0
+    image: ghcr.io/bobparkerbob888-tech/dingocoin:v1.18.0.0
     restart: on-failure
     stop_grace_period: 15m
     volumes:
@@ -302,15 +241,14 @@ services:
       - '-rpcport=34646'
       - '-port=33117'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '34646:34646'
       - '33117:33117'
 
   shibacoind:
-    image: shibacoin:1.2.1
+    image: ghcr.io/bobparkerbob888-tech/shibacoin:1.2.1
     restart: on-failure
     stop_grace_period: 15m
     volumes:
@@ -324,15 +262,14 @@ services:
       - '-rpcport=33863'
       - '-port=33864'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-maxconnections=64'
       - '-par=4'
     ports:
-      - '33863:33863'
       - '33864:33864'
 
   trumpowd:
-    image: trumpow:1.0
+    image: ghcr.io/bobparkerbob888-tech/trumpow:1.0
     restart: on-failure
     stop_grace_period: 15m
     volumes:
@@ -346,12 +283,12 @@ services:
       - '-rpcport=33883'
       - '-port=33884'
       - '-printtoconsole'
-      - '-dbcache=512'
+      - '-dbcache=4096'
       - '-par=0'
       - '-maxconnections=64'
     ports:
-      - '33883:33883'
       - '33884:33884'
 
 volumes:
   pool-data:
+  frontend-build:

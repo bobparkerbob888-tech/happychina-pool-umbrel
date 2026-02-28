@@ -1,43 +1,42 @@
 manifestVersion: 1
 id: happychina-pool
 name: HappyChina Mining Pool
-tagline: Multi-coin SHA256 + Scrypt mining pool with merge mining
+tagline: Multi-coin Scrypt mining pool with merge mining - mine 9 coins at once
 icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
 category: bitcoin
-version: "2.0.0"
+version: "2.1.0"
 port: 8080
 description: >-
-  A complete multi-algorithm mining pool for your Umbrel server.
-  Features a Node.js stratum server for SHA256 and Scrypt,
-  with a modern React dashboard and admin panel.
+  A complete Scrypt mining pool for your Umbrel server.
+  Features a Node.js stratum server with merge mining,
+  a modern React dashboard and admin panel.
 
   🚀 GETTING STARTED:
   1. Open the app after installation
   2. Click "Register" to create your account
   3. The FIRST account registered automatically becomes the admin
-  4. Go to Admin → Settings to choose Full or Pruned node mode
-  5. Set your wallet addresses in your profile settings
-  6. Connect your miners and start mining!
+  4. Set your wallet addresses in your profile settings
+  5. Connect your miners and start mining!
 
-  💾 NODE MODE: Choose between Full nodes (requires ~500GB+, keeps
-  full blockchain history) or Pruned nodes (requires ~50GB, saves
-  disk space). Change this in Admin → Settings after setup.
+  Supported coins (9 total, all Scrypt):
+  - Litecoin (LTC) - Primary
+  - Dogecoin (DOGE) - Merge-mined with LTC
+  - Pepecoin (PEPE) - Merge-mined with LTC
+  - Bells (BELLS) - Merge-mined with LTC
+  - Luckycoin (LKY) - Merge-mined with LTC
+  - Junkcoin (JKC) - Merge-mined with LTC
+  - Dingocoin (DINGO) - Merge-mined with LTC
+  - Shibacoin (SHIC) - Merge-mined with LTC
+  - TrumPOW (TRMP) - Merge-mined with LTC
 
-  Supported coins:
-  - SHA256: Bitcoin (BTC), Namecoin (NMC) via merge mining
-  - Scrypt: Litecoin (LTC), Dogecoin (DOGE), Pepecoin (PEPE), Bells (BELLS),
-    Luckycoin (LKY), Junkcoin (JKC), Dingocoin (DINGO), Shibacoin (SHIC),
-    TrumPOW (TRMP) via merge mining
-
-  Connect your ASICs:
-  - SHA256 miners: stratum+tcp://YOUR_UMBREL_IP:3342
-  - Scrypt miners: stratum+tcp://YOUR_UMBREL_IP:3333
+  Connect your Scrypt miners:
+  stratum+tcp://YOUR_UMBREL_IP:3333
 
   Use your wallet address as the username when connecting miners.
 
-  ⚠️ DISK SPACE: This app runs 11 blockchain daemons and requires
-  approximately 500GB+ of disk space for full sync. Ensure your
-  Umbrel has sufficient storage before installing.
+  ⚠️ DISK SPACE: This app runs 9 blockchain daemons and requires
+  significant disk space for full sync. Ensure your Umbrel has
+  sufficient storage before installing.
 
 developer: HappyChina
 website: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
@@ -48,7 +47,8 @@ support: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel/issues
 gallery:
   - https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
 releaseNotes: >-
-  v2.0.0 - Multi-coin Scrypt mining pool with merge mining support
+  v2.1.0 - Scrypt-only mining pool with 9 coins merge-mined with Litecoin.
+  All pre-built Docker images from GHCR.
 dependencies: []
 permissions: []
 path: ""
