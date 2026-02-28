@@ -3,6 +3,7 @@ const db = require('../../models/database');
 const config = require('../../config');
 const { authMiddleware, adminMiddleware } = require('../../middleware/auth');
 const { coins } = require('../../config/coins');
+const { startCoinDaemon, stopCoinDaemon, getCoinDaemonStatus } = require('../../services/dockerControl');
 
 const router = express.Router();
 
@@ -193,8 +194,8 @@ router.get('/coins', (req, res) => {
   res.json(coinSettings);
 });
 
-// Update per-coin settings
-router.put('/coins/:coinId', (req, res) => {
+// Update per-coin settings (enable/disable starts/stops daemon container)
+router.put('/coins/:coinId', async (req, res) => {
   const { coinId } = req.params;
   if (!coins[coinId]) return res.status(404).json({ error: 'Coin not found' });
 
@@ -205,7 +206,25 @@ router.put('/coins/:coinId', (req, res) => {
   `);
 
   if (pruned !== undefined) upsert.run(`coin_${coinId}_pruned`, String(pruned));
-  if (enabled !== undefined) upsert.run(`coin_${coinId}_enabled`, String(enabled));
+  if (enabled !== undefined) {
+    upsert.run(`coin_${coinId}_enabled`, String(enabled));
+
+    // Start or stop the daemon container
+    try {
+      if (enabled === true || enabled === 'true') {
+        const result = await startCoinDaemon(coinId);
+        console.log(`[Admin] Started daemon for ${coins[coinId].name}:`, result.action);
+        return res.json({ message: `${coins[coinId].name} enabled - daemon ${result.action}`, daemon: result });
+      } else {
+        const result = await stopCoinDaemon(coinId);
+        console.log(`[Admin] Stopped daemon for ${coins[coinId].name}:`, result.action);
+        return res.json({ message: `${coins[coinId].name} disabled - daemon ${result.action}`, daemon: result });
+      }
+    } catch (err) {
+      console.error(`[Admin] Docker control error for ${coinId}:`, err.message);
+      return res.json({ message: `${coins[coinId].name} settings updated (daemon control failed: ${err.message})`, error: err.message });
+    }
+  }
 
   res.json({ message: `${coins[coinId].name} settings updated` });
 });

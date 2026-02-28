@@ -21,6 +21,7 @@ services:
       POOL_NAME: 'HappyChina Pool'
       POOL_FEE: '1.0'
       DB_PATH: /app/data/pool.db
+      DOCKER_PROJECT: happychina-pool
       LTC_RPC_HOST: litecoind
       LTC_RPC_PORT: '9332'
       LTC_RPC_USER: umbrel
@@ -60,6 +61,7 @@ services:
     volumes:
       - pool-data:/app/data
       - frontend-build:/frontend/build:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - ${APP_DATA_DIR:-.}/coins.js:/app/src/config/coins.js:ro
       - ${APP_DATA_DIR:-.}/server.js:/app/src/stratum/server.js:ro
       - ${APP_DATA_DIR:-.}/daemonRPC.js:/app/src/services/daemonRPC.js:ro
@@ -69,6 +71,7 @@ services:
       - ${APP_DATA_DIR:-.}/index.js:/app/src/index.js:ro
       - ${APP_DATA_DIR:-.}/utcTimestamps.js:/app/src/middleware/utcTimestamps.js:ro
       - ${APP_DATA_DIR:-.}/admin.js:/app/src/api/routes/admin.js:ro
+      - ${APP_DATA_DIR:-.}/dockerControl.js:/app/src/services/dockerControl.js:ro
     ports:
       - '3332-3344:3332-3344'
     expose:
@@ -98,6 +101,137 @@ services:
     expose:
       - '80'
 
+  # ============================================================
+  # COIN DAEMONS - profiles: ["coins"] means they do NOT auto-start
+  # The backend starts/stops them when admin enables/disables coins
+  # ============================================================
+
+  litecoind:
+    image: uphold/litecoin-core:0.21.4
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - ltc-data:/data/.litecoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1 -txindex=1
+      -rpcport=9332
+
+  dogecoind:
+    image: bluematt/dogecoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - doge-data:/root/.dogecoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=22555
+
+  pepecoind:
+    image: ghcr.io/nicklausw/pepecoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - pepe-data:/root/.pepecoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=29373
+
+  bellsd:
+    image: ghcr.io/nicklausw/bellscoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - bells-data:/root/.bells
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=19918
+
+  luckycoind:
+    image: ghcr.io/nicklausw/luckycoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - lky-data:/root/.luckycoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=9918
+
+  junkcoind:
+    image: ghcr.io/nicklausw/junkcoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - jkc-data:/root/.junkcoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=9772
+
+  dingocoind:
+    image: ghcr.io/nicklausw/dingocoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - dingo-data:/root/.dingocoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=34646
+
+  shibacoind:
+    image: ghcr.io/nicklausw/shibacoin:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - shic-data:/root/.shibacoin
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=33863
+
+  trumpowd:
+    image: ghcr.io/nicklausw/trumpow:latest
+    profiles: ["coins"]
+    restart: on-failure
+    volumes:
+      - trmp-data:/root/.trumpow
+    command: >
+      -printtoconsole
+      -rpcuser=umbrel -rpcpassword=umbrel
+      -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -server=1
+      -rpcport=33883
+
 volumes:
   pool-data:
   frontend-build:
+  ltc-data:
+  doge-data:
+  pepe-data:
+  bells-data:
+  lky-data:
+  jkc-data:
+  dingo-data:
+  shic-data:
+  trmp-data:
