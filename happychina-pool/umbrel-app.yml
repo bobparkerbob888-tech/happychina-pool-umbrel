@@ -2,7 +2,7 @@ manifestVersion: 1
 id: happychina-pool
 name: HappyChina Mining Pool
 tagline: Multi-coin SHA256 + Scrypt mining pool with merge mining
-icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/icon.png
+icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
 category: bitcoin
 version: "2.0.0"
 port: 8080
@@ -41,7 +41,16 @@ description: >-
 
 developer: HappyChina
 website: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
+submitter: HappyChina
+submission: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
 repo: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
 support: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel/issues
+gallery:
+  - https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
+releaseNotes: >-
+  v2.0.0 - Multi-coin Scrypt mining pool with merge mining support
 dependencies: []
 permissions: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
