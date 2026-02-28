@@ -10,9 +10,18 @@ class BlockMonitor {
     this.daemonStatus = new Map(); // coinId -> { online, syncing, syncProgress, blockHeight, difficulty, networkHashrate }
   }
 
+  // Check if a coin is enabled in the settings DB
+  isCoinEnabled(coinId) {
+    try {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(`coin_${coinId}_enabled`);
+      return row ? row.value === 'true' : false; // default disabled
+    } catch { return false; }
+  }
+
   start() {
     for (const [coinId, coin] of Object.entries(coins)) {
-      // Initialize status as offline
+      const enabled = this.isCoinEnabled(coinId);
+      // Initialize status
       this.daemonStatus.set(coinId, {
         online: false,
         syncing: false,
@@ -20,11 +29,42 @@ class BlockMonitor {
         blockHeight: 0,
         difficulty: 0,
         networkHashrate: 0,
-        lastChecked: null
+        lastChecked: null,
+        enabled: enabled
       });
-      this.monitorCoin(coinId, coin);
+      if (enabled) {
+        this.monitorCoin(coinId, coin);
+      } else {
+        console.log(`[BlockMonitor] ${coin.name} is disabled, skipping`);
+      }
     }
-    console.log('[BlockMonitor] Started monitoring all coins');
+    const enabledCount = [...this.daemonStatus.values()].filter(s => s.enabled).length;
+    console.log(`[BlockMonitor] Started monitoring ${enabledCount}/${Object.keys(coins).length} enabled coins`);
+
+    // Re-check enabled status every 60 seconds (so admin changes take effect)
+    this._enabledCheckInterval = setInterval(() => this._recheckEnabled(), 60000);
+  }
+
+  _recheckEnabled() {
+    for (const [coinId, coin] of Object.entries(coins)) {
+      const enabled = this.isCoinEnabled(coinId);
+      const status = this.daemonStatus.get(coinId);
+      const wasEnabled = status.enabled;
+      status.enabled = enabled;
+
+      if (enabled && !wasEnabled) {
+        // Coin was just enabled - start monitoring
+        console.log(`[BlockMonitor] ${coin.name} enabled, starting monitor`);
+        this.monitorCoin(coinId, coin);
+      } else if (!enabled && wasEnabled) {
+        // Coin was just disabled - stop monitoring
+        console.log(`[BlockMonitor] ${coin.name} disabled, stopping monitor`);
+        const interval = this.intervals.get(coinId);
+        if (interval) { clearInterval(interval); this.intervals.delete(coinId); }
+        status.online = false;
+        status.syncing = false;
+      }
+    }
   }
 
   monitorCoin(coinId, coin) {
@@ -149,6 +189,7 @@ class BlockMonitor {
   }
 
   stop() {
+    if (this._enabledCheckInterval) clearInterval(this._enabledCheckInterval);
     for (const interval of this.intervals.values()) {
       clearInterval(interval);
     }
