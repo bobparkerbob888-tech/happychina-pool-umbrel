@@ -229,6 +229,34 @@ router.put('/coins/:coinId', async (req, res) => {
   res.json({ message: `${coins[coinId].name} settings updated` });
 });
 
+// Reset all coin settings to defaults (all disabled, not pruned)
+router.post('/coins/reset', (req, res) => {
+  const upsert = db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  const transaction = db.transaction(() => {
+    for (const coinId of Object.keys(coins)) {
+      upsert.run(`coin_${coinId}_enabled`, 'false');
+      upsert.run(`coin_${coinId}_pruned`, 'false');
+    }
+  });
+
+  transaction();
+
+  // Stop all daemon containers
+  const stopPromises = Object.keys(coins).map(coinId =>
+    stopCoinDaemon(coinId).catch(err => console.error(`[Admin] Error stopping ${coinId}:`, err.message))
+  );
+
+  Promise.all(stopPromises).then(() => {
+    res.json({ message: 'All coin settings reset to defaults. All daemons stopped.' });
+  }).catch(() => {
+    res.json({ message: 'Settings reset. Some daemons may still be running.' });
+  });
+});
+
 // Get recent payments list
 router.get('/payments', (req, res) => {
   const { page = 1, limit = 50, status, coin } = req.query;

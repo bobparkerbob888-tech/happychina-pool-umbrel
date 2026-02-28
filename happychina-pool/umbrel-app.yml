@@ -4,7 +4,7 @@ name: HappyChina Mining Pool
 tagline: Multi-coin Scrypt mining pool with merge mining - mine 9 coins at once
 icon: https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
 category: bitcoin
-version: "2.1.0"
+version: "2.2.0"
 port: 8080
 description: >-
   A complete Scrypt mining pool for your Umbrel server.
@@ -34,9 +34,12 @@ description: >-
 
   Use your wallet address as the username when connecting miners.
 
-  ⚠️ DISK SPACE: This app runs 9 blockchain daemons and requires
-  significant disk space for full sync. Ensure your Umbrel has
-  sufficient storage before installing.
+  ⚙️ COINS ARE DISABLED BY DEFAULT - No blockchain daemons start
+  on install. Enable coins one at a time from Admin → Coins.
+  Each coin downloads its daemon image when first enabled.
+
+  🔄 RESET: Use Admin → Coins → Reset All to disable all coins
+  and stop all daemons. Settings persist across reinstalls.
 
 developer: HappyChina
 website: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel
@@ -47,8 +50,9 @@ support: https://github.com/bobparkerbob888-tech/happychina-pool-umbrel/issues
 gallery:
   - https://raw.githubusercontent.com/bobparkerbob888-tech/happychina-pool-umbrel/main/happychina-pool/icon.png
 releaseNotes: >-
-  v2.1.0 - Scrypt-only mining pool with 9 coins merge-mined with Litecoin.
-  All pre-built Docker images from GHCR.
+  v2.2.0 - Coins disabled by default, enable from admin panel.
+  Daemons start/stop automatically when you enable/disable coins.
+  Reset All button to restore defaults. Zero bandwidth on install.
 dependencies: []
 permissions: []
 path: ""
