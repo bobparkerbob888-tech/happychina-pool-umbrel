@@ -184,7 +184,7 @@ router.get('/coins', (req, res) => {
       name: coin.name,
       symbol: coin.symbol,
       algorithm: coin.algorithm,
-      stratumPort: coin.stratumPort,
+      stratumPort: coin.mergeMinedWith ? coins[coin.mergeMinedWith].stratumPort : coin.stratumPort,
       mergeMinedWith: coin.mergeMinedWith || null,
       pruned: pruned === 'true',
       enabled: enabled === 'true'
