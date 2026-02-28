@@ -432,11 +432,11 @@ function CoinsTab() {
 
   // Check if anything changed
   const hasChanges = Object.keys(draft).some(id =>
-    draft[id].pruned !== coins[id]?.pruned || draft[id].enabled !== coins[id]?.enabled
+    draft[id].enabled !== coins[id]?.enabled
   );
 
   const changedCoins = Object.keys(draft).filter(id =>
-    draft[id].pruned !== coins[id]?.pruned || draft[id].enabled !== coins[id]?.enabled
+    draft[id].enabled !== coins[id]?.enabled
   );
 
   const handleSave = async () => {
@@ -445,7 +445,7 @@ function CoinsTab() {
     setMessage('');
     try {
       for (const id of changedCoins) {
-        await updateAdminCoin(id, { pruned: draft[id].pruned, enabled: draft[id].enabled });
+        await updateAdminCoin(id, { enabled: draft[id].enabled });
       }
       setCoins(JSON.parse(JSON.stringify(draft)));
       setMessage(`Saved changes for ${changedCoins.map(id => draft[id].symbol).join(', ')}`);
@@ -479,21 +479,21 @@ function CoinsTab() {
         )}
       </div>
       <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
-        Manage per-coin settings. Pruned nodes use less disk space but cannot serve historical blocks.
-        Disable coins to stop mining them without removing from config.
+        Enable coins to start their daemon and begin syncing. Disable to stop the daemon.
+        All coins run as full nodes with transaction index for payment processing.
       </p>
       {message && <div className="success-message">{message}</div>}
       {error && <div className="error-message">{error}</div>}
       <table className="data-table" style={{ width: '100%' }}>
         <thead>
-          <tr><th>Coin</th><th>Algorithm</th><th>Port</th><th>Status</th><th>Sync</th><th>Height</th><th>Pruned</th><th>Enabled</th></tr>
+          <tr><th>Coin</th><th>Algorithm</th><th>Port</th><th>Status</th><th>Sync</th><th>Height</th><th>Enabled</th></tr>
         </thead>
         <tbody>
           {Object.entries(draft).map(([id, coin]) => {
             const daemon = daemonStatus[id] || {};
             const status = !daemon.online ? 'offline' : daemon.syncing ? 'syncing' : 'synced';
             const statusColor = status === 'synced' ? 'var(--green)' : status === 'syncing' ? '#ffa726' : '#ef5350';
-            const changed = coin.pruned !== coins[id]?.pruned || coin.enabled !== coins[id]?.enabled;
+            const changed = coin.enabled !== coins[id]?.enabled;
             return (
               <tr key={id} style={{ background: changed ? 'rgba(255,167,38,0.05)' : undefined }}>
                 <td>
@@ -507,7 +507,6 @@ function CoinsTab() {
                 <td><span style={{ color: statusColor, fontWeight: 500, fontSize: 12 }}>{status.toUpperCase()}</span></td>
                 <td style={{ fontSize: 12 }}>{daemon.syncProgress ? `${daemon.syncProgress.toFixed(1)}%` : '-'}</td>
                 <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }}>{(daemon.blockHeight || 0).toLocaleString()}</td>
-                <td><Toggle checked={coin.pruned} onChange={() => toggleDraft(id, 'pruned')} /></td>
                 <td><Toggle checked={coin.enabled} onChange={() => toggleDraft(id, 'enabled')} /></td>
               </tr>
             );
