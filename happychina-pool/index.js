@@ -137,7 +137,25 @@ app.listen(config.port, config.host, () => {
 // Start Stratum server
 stratumServer.start();
 
-// Start block monitor
+// Auto-start daemon containers for enabled coins on boot
+const { startCoinDaemon } = require('./services/dockerControl');
+const { coins } = require('./config/coins');
+(async () => {
+  console.log('[Pool] Auto-starting daemon containers for enabled coins...');
+  for (const coinId of Object.keys(coins)) {
+    try {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('coin_' + coinId + '_enabled');
+      if (row && row.value === 'true') {
+        const result = await startCoinDaemon(coinId);
+        console.log('[Pool] Daemon ' + coinId + ': ' + result.action);
+      }
+    } catch (err) {
+      console.error('[Pool] Failed to start ' + coinId + ' daemon:', err.message);
+    }
+  }
+})();
+
+// Start block monitor (after daemon startup initiated)
 blockMonitor.start();
 
 // Initial hashrate calculation
