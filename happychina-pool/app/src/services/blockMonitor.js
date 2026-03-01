@@ -103,12 +103,25 @@ class BlockMonitor {
     status.online = true;
     status.lastChecked = new Date().toISOString();
 
-    // Check sync progress
+    // Check sync progress (enhanced: also check initialblockdownload and blocks vs headers)
     const verificationProgress = info.verificationprogress || 1;
-    status.syncProgress = Math.min(verificationProgress * 100, 100);
-    status.syncing = verificationProgress < 0.9999;
+    const initialBlockDownload = info.initialblockdownload || false;
+    const blocks = info.blocks || 0;
+    const headers = info.headers || 0;
 
-    const blockHeight = info.blocks || info.headers || 0;
+    // Some coins (e.g. JKC) report verificationprogress=1 during sync because nMinimumChainWork=0
+    let isSyncing = verificationProgress < 0.9999;
+    if (!isSyncing && initialBlockDownload) isSyncing = true;
+    if (!isSyncing && headers > 0 && blocks < headers * 0.99) isSyncing = true;
+
+    let actualProgress = verificationProgress;
+    if (headers > 0 && blocks < headers * 0.99) {
+      actualProgress = Math.min(blocks / headers, actualProgress);
+    }
+    status.syncProgress = Math.min(actualProgress * 100, 100);
+    status.syncing = isSyncing;
+
+    const blockHeight = blocks || headers || 0;
     status.blockHeight = blockHeight;
 
     // Get difficulty

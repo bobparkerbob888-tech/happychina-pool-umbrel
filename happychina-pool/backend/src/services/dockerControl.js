@@ -44,7 +44,7 @@ const DAEMON_CONFIGS = {
     service: 'junkcoind',
     image: 'btccom/junkcoin:latest',
     dataDir: '/root/.junkcoin',
-    cmd: ['/usr/local/bin/junkcoind', '-server=1', '-rpcuser=umbrel', '-rpcpassword=umbrel', '-rpcallowip=0.0.0.0/0', '-rpcbind=0.0.0.0', '-rpcport=9772', '-port=9771', '-printtoconsole']
+    cmd: ['/usr/local/bin/junkcoind', '-server=1', '-rpcuser=umbrel', '-rpcpassword=umbrel', '-rpcallowip=0.0.0.0/0', '-rpcbind=0.0.0.0', '-rpcport=9772', '-port=9771', '-printtoconsole', '-addnode=103.133.25.201:9771', '-addnode=mainnet.junk-coin.com', '-addnode=junk-seed.s3na.xyz', '-addnode=jkc-seed.junkiewally.xyz']
   },
   dingocoin: {
     service: 'dingocoind',
