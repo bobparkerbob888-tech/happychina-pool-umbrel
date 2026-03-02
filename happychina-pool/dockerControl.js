@@ -60,7 +60,7 @@ const DAEMON_CONFIGS = {
   },
   luckycoin: {
     service: 'luckycoind',
-    image: 'btccom/luckycoin:4.0.1',
+    image: 'local/luckycoin:5.0.1',
     dataDir: '/root/.luckycoin',
     cmd: ['/bin/luckycoind', '-server=1', '-rpcuser=umbrel', '-rpcpassword=umbrel', '-rpcallowip=0.0.0.0/0', '-rpcbind=0.0.0.0', '-rpcport=9918', '-port=9917', '-printtoconsole']
   },
