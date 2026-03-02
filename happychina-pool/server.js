@@ -572,11 +572,45 @@ class StratumServer extends EventEmitter {
                   auxBlock = await child.daemon.getAuxBlock();
                   child.coin.auxpowApi = 'getauxblock';
                 } catch (e2) {
-                  if (!child._addressWarnShown) {
-                    console.error(`[MergeMining] Cannot get address for ${child.coin.symbol}: ${e.message}. Set ${child.coin.symbol}_PAYOUT_ADDRESS in .env`);
-                    child._addressWarnShown = true;
+                  // Auto-generate an address using Node.js crypto (secp256k1)
+                  try {
+                    const crypto = require('crypto');
+                    const ecdh = crypto.createECDH('secp256k1');
+                    ecdh.generateKeys();
+                    const pubKeyBuf = Buffer.from(ecdh.getPublicKey('hex', 'compressed'), 'hex');
+                    const privKeyHex = ecdh.getPrivateKey('hex');
+                    // SHA256 + RIPEMD160 of public key
+                    const sha256 = crypto.createHash('sha256').update(pubKeyBuf).digest();
+                    const ripemd160 = crypto.createHash('ripemd160').update(sha256).digest();
+                    // Version byte from coin config addressPrefixes
+                    // JKC mainnet = 16, regtest = 47
+                    const versionByte = child.coin.symbol === 'JKC' ? 16 : 0;
+                    const payload = Buffer.concat([Buffer.from([versionByte]), ripemd160]);
+                    const checksum = crypto.createHash('sha256').update(
+                      crypto.createHash('sha256').update(payload).digest()
+                    ).digest().slice(0, 4);
+                    const fullPayload = Buffer.concat([payload, checksum]);
+                    // Base58 encode
+                    const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+                    let num = BigInt('0x' + fullPayload.toString('hex'));
+                    let result = '';
+                    while (num > 0n) { const r = num % 58n; num = num / 58n; result = ALPHABET[Number(r)] + result; }
+                    for (const b of fullPayload) { if (b === 0) result = '1' + result; else break; }
+                    child.address = result;
+                    // Save private key so operator can import it later
+                    const fs = require('fs');
+                    const keyFile = '/app/data/jkc_generated_key.json';
+                    const keyData = { address: result, privateKeyHex: privKeyHex, generated: new Date().toISOString(),
+                      note: 'Import into JKC wallet with: junkcoin-cli importprivkey <WIF>' };
+                    fs.writeFileSync(keyFile, JSON.stringify(keyData, null, 2));
+                    console.log(`[MergeMining] Auto-generated ${child.coin.symbol} payout address: ${result} (key saved to ${keyFile})`);
+                  } catch (genErr) {
+                    if (!child._addressWarnShown) {
+                      console.error(`[MergeMining] Cannot get address for ${child.coin.symbol}: ${e.message}. Set ${child.coin.symbol}_PAYOUT_ADDRESS in .env`);
+                      child._addressWarnShown = true;
+                    }
+                    continue;
                   }
-                  continue;
                 }
               }
             }
