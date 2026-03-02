@@ -48,6 +48,7 @@ services:
       JKC_RPC_PORT: '9772'
       JKC_RPC_USER: umbrel
       JKC_RPC_PASS: umbrel
+      JKC_PAYOUT_ADDRESS: '7ZcDG1N1X6TbiFmzNLxtBXvMd1Gm7sC14d'  # CHANGE THIS! JKC daemon has no wallet - set your own JKC address from your wallet
       DINGO_RPC_HOST: dingocoind
       DINGO_RPC_PORT: '34646'
       DINGO_RPC_USER: umbrel
