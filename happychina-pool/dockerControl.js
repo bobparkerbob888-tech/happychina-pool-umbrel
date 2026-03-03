@@ -32,6 +32,90 @@ async function getNetwork() {
   return NETWORK;
 }
 
+/**
+ * Ensure backend can reach all running daemon containers.
+ * If daemons are on a different network (e.g. after Umbrel restart),
+ * connect the backend container to the daemon network with proper aliases.
+ * Also connect daemons to the backend network for bidirectional connectivity.
+ */
+async function ensureNetworkConnectivity() {
+  try {
+    const backendNetwork = await getNetwork();
+    const hostname = require('os').hostname();
+    let daemonNetwork = null;
+
+    // Find what network the existing daemon containers are on
+    for (const [coinId, cfg] of Object.entries(DAEMON_CONFIGS)) {
+      const container = await findContainer(cfg.service);
+      if (container && container.State === 'running') {
+        const inspectRes = await dockerRequest('GET', `/containers/${container.Id}/json`);
+        if (inspectRes.statusCode === 200 && inspectRes.data) {
+          const containerNetworks = Object.keys(inspectRes.data.NetworkSettings.Networks);
+          for (const net of containerNetworks) {
+            if (net !== backendNetwork) {
+              daemonNetwork = net;
+              break;
+            }
+          }
+          if (daemonNetwork) break;
+        }
+      }
+    }
+
+    if (!daemonNetwork) {
+      console.log('[Docker] All daemons on same network as backend, or no daemons running');
+      return;
+    }
+
+    console.log(`[Docker] Daemon network: ${daemonNetwork}, Backend network: ${backendNetwork}`);
+    console.log('[Docker] Bridging networks for connectivity...');
+
+    // Connect backend to daemon network
+    const connectBackend = await dockerRequest('POST', `/networks/${daemonNetwork}/connect`, {
+      Container: hostname,
+      EndpointConfig: {}
+    });
+    if (connectBackend.statusCode === 200) {
+      console.log(`[Docker] Connected backend to ${daemonNetwork}`);
+    } else if (connectBackend.statusCode === 403 && connectBackend.data && String(connectBackend.data).includes('already exists')) {
+      console.log(`[Docker] Backend already on ${daemonNetwork}`);
+    } else {
+      // Try by container name too
+      const connectByName = await dockerRequest('POST', `/networks/${daemonNetwork}/connect`, {
+        Container: `${PROJECT}_backend_1`,
+        EndpointConfig: {}
+      });
+      if (connectByName.statusCode === 200) {
+        console.log(`[Docker] Connected backend to ${daemonNetwork} (by name)`);
+      }
+    }
+
+    // Also connect all daemon containers to backend network with aliases
+    for (const [coinId, cfg] of Object.entries(DAEMON_CONFIGS)) {
+      const container = await findContainer(cfg.service);
+      if (container && container.State === 'running') {
+        const inspectRes = await dockerRequest('GET', `/containers/${container.Id}/json`);
+        if (inspectRes.statusCode === 200 && inspectRes.data) {
+          const containerNetworks = Object.keys(inspectRes.data.NetworkSettings.Networks);
+          if (!containerNetworks.includes(backendNetwork)) {
+            const connectRes = await dockerRequest('POST', `/networks/${backendNetwork}/connect`, {
+              Container: container.Id,
+              EndpointConfig: { Aliases: [cfg.service] }
+            });
+            if (connectRes.statusCode === 200) {
+              console.log(`[Docker] Connected ${cfg.service} to ${backendNetwork}`);
+            }
+          }
+        }
+      }
+    }
+
+    console.log('[Docker] Network connectivity ensured');
+  } catch (err) {
+    console.error('[Docker] Error ensuring network connectivity:', err.message);
+  }
+}
+
 // Coin daemon container configurations (real images from VPS)
 const DAEMON_CONFIGS = {
   litecoin: {
@@ -160,11 +244,15 @@ async function startCoinDaemon(coinId) {
   if (container) {
     // Container exists - just start it if stopped
     if (container.State === 'running') {
+      // Ensure network connectivity for existing running container
+      await ensureContainerNetwork(container.Id, cfg.service);
       return { success: true, action: 'already_running', service: cfg.service };
     }
     const res = await dockerRequest('POST', `/containers/${container.Id}/start`);
     if (res.statusCode === 204 || res.statusCode === 304) {
       console.log(`[Docker] Started existing ${cfg.service}`);
+      // Ensure network connectivity after start
+      await ensureContainerNetwork(container.Id, cfg.service);
       return { success: true, action: 'started', service: cfg.service };
     }
     throw new Error(`Failed to start ${cfg.service}: ${res.statusCode} ${JSON.stringify(res.data)}`);
@@ -212,11 +300,35 @@ async function startCoinDaemon(coinId) {
     container = await findContainer(cfg.service);
     if (container) {
       await dockerRequest('POST', `/containers/${container.Id}/start`);
+      await ensureContainerNetwork(container.Id, cfg.service);
       return { success: true, action: 'started', service: cfg.service };
     }
   }
 
   throw new Error(`Failed to create ${cfg.service}: ${res.statusCode} ${JSON.stringify(res.data)}`);
+}
+
+// Ensure a specific container is on the backend's network
+async function ensureContainerNetwork(containerId, serviceName) {
+  try {
+    const backendNetwork = await getNetwork();
+    const inspectRes = await dockerRequest('GET', `/containers/${containerId}/json`);
+    if (inspectRes.statusCode === 200 && inspectRes.data) {
+      const containerNetworks = Object.keys(inspectRes.data.NetworkSettings.Networks);
+      if (!containerNetworks.includes(backendNetwork)) {
+        const connectRes = await dockerRequest('POST', `/networks/${backendNetwork}/connect`, {
+          Container: containerId,
+          EndpointConfig: { Aliases: [serviceName] }
+        });
+        if (connectRes.statusCode === 200) {
+          console.log(`[Docker] Connected ${serviceName} to ${backendNetwork}`);
+        }
+      }
+    }
+  } catch (err) {
+    // Non-fatal
+    console.error(`[Docker] ensureContainerNetwork ${serviceName}:`, err.message);
+  }
 }
 
 async function stopCoinDaemon(coinId) {
@@ -256,4 +368,4 @@ async function getCoinDaemonStatus(coinId) {
   };
 }
 
-module.exports = { startCoinDaemon, stopCoinDaemon, getCoinDaemonStatus, DAEMON_CONFIGS };
+module.exports = { startCoinDaemon, stopCoinDaemon, getCoinDaemonStatus, ensureNetworkConnectivity, DAEMON_CONFIGS };

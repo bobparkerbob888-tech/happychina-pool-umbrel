@@ -138,9 +138,15 @@ app.listen(config.port, config.host, () => {
 stratumServer.start();
 
 // Auto-start daemon containers for enabled coins on boot
-const { startCoinDaemon } = require('./services/dockerControl');
+// FIX: Ensure network connectivity FIRST so backend can reach daemon containers
+// even if they're on a different Docker network (e.g. after Umbrel restart)
+const { startCoinDaemon, ensureNetworkConnectivity } = require('./services/dockerControl');
 const { coins } = require('./config/coins');
 (async () => {
+  // Bridge Docker networks before starting daemons
+  console.log('[Pool] Ensuring Docker network connectivity...');
+  await ensureNetworkConnectivity();
+
   console.log('[Pool] Auto-starting daemon containers for enabled coins...');
   for (const coinId of Object.keys(coins)) {
     try {
@@ -153,6 +159,11 @@ const { coins } = require('./config/coins');
       console.error('[Pool] Failed to start ' + coinId + ' daemon:', err.message);
     }
   }
+
+  // Re-check network connectivity after all daemons started
+  // (in case new containers were created on a different network)
+  await ensureNetworkConnectivity();
+  console.log('[Pool] All daemons started and networks bridged');
 })();
 
 // Start block monitor (after daemon startup initiated)
