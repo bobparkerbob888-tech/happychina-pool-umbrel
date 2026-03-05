@@ -361,7 +361,7 @@ class StratumServer extends EventEmitter {
       if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
     } catch (e) {}
     try {
-      const info = await daemon.call('getaddressinfo', [address]);
+      const info = await daemon.callWallet('getaddressinfo', [address]);
       if (info && info.scriptPubKey) return Buffer.from(info.scriptPubKey, 'hex');
     } catch (e) {}
     // Manual bech32 P2WPKH decode as last resort
@@ -381,8 +381,8 @@ class StratumServer extends EventEmitter {
       // Try to load/create wallet and get address
       try { await daemon.ensureWalletLoaded(); } catch (e) {}
       let address;
-      try { address = await daemon.getNewAddress(); } catch (e) {
-        try { address = await daemon.call('getnewaddress', ['pool']); } catch (e2) {}
+      try { address = await daemon.callWallet('getnewaddress', ['pool']); } catch (e) {
+        try { address = await daemon.callWallet('getnewaddress', ['pool']); } catch (e2) {}
       }
       if (address) {
         const spk = await this.getScriptPubKey(daemon, address);
@@ -476,7 +476,12 @@ class StratumServer extends EventEmitter {
         const template = await daemon.getBlockTemplate(rules);
 
         // Attach pool scriptPubKey to template for coinbase output
-        const poolSpk = this.poolScriptPubKeys.get(coinId);
+        let poolSpk = this.poolScriptPubKeys.get(coinId);
+        if (!poolSpk) {
+          // Retry initPoolAddress if not yet set (daemon may have been starting)
+          await this.initPoolAddress(coinId).catch(() => {});
+          poolSpk = this.poolScriptPubKeys.get(coinId);
+        }
         if (poolSpk) {
           template._poolScriptPubKey = poolSpk;
         }

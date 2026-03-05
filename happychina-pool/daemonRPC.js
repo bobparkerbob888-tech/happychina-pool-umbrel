@@ -65,11 +65,11 @@ class DaemonRPC {
     if (this._poolScriptPubKey) return this._poolScriptPubKey;
     try {
       await this.ensureWalletLoaded();
-      const address = await this.call('getnewaddress', ['pool']);
+      const address = await this.callWallet('getnewaddress', ['pool']);
       // Try getaddressinfo first (newer), fall back to validateaddress
       let addrInfo;
       try {
-        addrInfo = await this.call('getaddressinfo', [address]);
+        addrInfo = await this.callWallet('getaddressinfo', [address]);
       } catch {
         addrInfo = await this.call('validateaddress', [address]);
       }
@@ -229,6 +229,18 @@ class DaemonRPC {
   }
   async getTransaction(txid) { return this.call('gettransaction', [txid]); }
   async getNewAddress() { return this.call('getnewaddress', []); }
+
+  async callWallet(method, params = [], walletName = 'pool') {
+    this.requestId++;
+    try {
+      const walletUrl = this.url + '/wallet/' + walletName;
+      const response = await require('axios').post(walletUrl, {
+        jsonrpc: '2.0', id: this.requestId, method, params
+      }, { auth: this.user ? { username: this.user, password: this.pass } : undefined, timeout: 30000 });
+      if (response.data.error) throw new Error(response.data.error.message);
+      return response.data.result;
+    } catch (err) { throw err; }
+  }
 
   async ensureWalletLoaded() {
     try {
