@@ -77,6 +77,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${APP_DATA_DIR:-.}/coins.js:/app/src/config/coins.js:ro
       - ${APP_DATA_DIR:-.}/server.js:/app/src/stratum/server.js:ro
+      - ${APP_DATA_DIR:-.}/auxpow.js:/app/src/stratum/auxpow.js:ro
       - ${APP_DATA_DIR:-.}/daemonRPC.js:/app/src/services/daemonRPC.js:ro
       - ${APP_DATA_DIR:-.}/blockMonitor.js:/app/src/services/blockMonitor.js:ro
       - ${APP_DATA_DIR:-.}/shareProcessor.js:/app/src/services/shareProcessor.js:ro
