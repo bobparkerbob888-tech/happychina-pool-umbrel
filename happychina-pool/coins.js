@@ -11,12 +11,13 @@ const coins = {
     stratumPort: 3333,
     // Multiple difficulty ports - vardiff ramps up from starting diff
     stratumPorts: [
+      { port: 3332, diff: 2000000000, fixedDiff: true, label: 'Fixed Diff 2000M (Big rental rigs)' },
       { port: 3333, diff: 1048576, fixedDiff: true, label: 'Fixed Diff 1M (ASIC miners)' },
       { port: 3344, diff: 8,    label: 'Low Diff (CPU/GPU miners)' }
     ],
     reward: 6.25,
     blockTime: 150,
-    confirmations: 2,
+    confirmations: 60,
     segwit: true,
     mweb: true,
     daemon: {
@@ -35,9 +36,10 @@ const coins = {
     stratumPort: 3334,
     reward: 10000,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 40,
     mergeMinedWith: 'litecoin',
     chainId: 98,
+    payoutAddress: process.env.DOGE_PAYOUT_ADDRESS || '',
     auxpowApi: 'getauxblock',
     daemon: {
       host: process.env.DOGE_RPC_HOST || '127.0.0.1',
@@ -55,9 +57,10 @@ const coins = {
     stratumPort: 3335,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 100,
     mergeMinedWith: 'litecoin',
     chainId: 63,
+    payoutAddress: process.env.PEPE_PAYOUT_ADDRESS || '',
     auxpowApi: 'createauxblock',
     daemon: {
       host: process.env.PEPE_RPC_HOST || '127.0.0.1',
@@ -75,10 +78,11 @@ const coins = {
     stratumPort: 3336,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 100,
     segwit: true,
     mergeMinedWith: 'litecoin',
     chainId: 16,
+    payoutAddress: process.env.BELLS_PAYOUT_ADDRESS || '',
     auxpowApi: 'createauxblock',
     daemon: {
       host: process.env.BELLS_RPC_HOST || '127.0.0.1',
@@ -89,6 +93,27 @@ const coins = {
     explorer: '',
     addressPrefixes: ['B']
   },
+  luckycoin: {
+    name: 'Luckycoin',
+    symbol: 'LKY',
+    algorithm: 'scrypt',
+    stratumPort: 3337,
+    reward: 0,
+    blockTime: 60,
+    confirmations: 100,
+    mergeMinedWith: 'litecoin',
+    chainId: 0,
+    auxpowApi: 'createauxblock',
+    payoutAddress: process.env.LKY_PAYOUT_ADDRESS || '',
+    daemon: {
+      host: process.env.LKY_RPC_HOST || '127.0.0.1',
+      port: parseInt(process.env.LKY_RPC_PORT) || 9918,
+      user: process.env.LKY_RPC_USER || 'rpcuser',
+      pass: process.env.LKY_RPC_PASS || 'rpcuser'
+    },
+    explorer: '',
+    addressPrefixes: ['L']
+  },
   junkcoin: {
     name: 'Junkcoin',
     symbol: 'JKC',
@@ -96,7 +121,7 @@ const coins = {
     stratumPort: 3338,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 100,
     mergeMinedWith: 'litecoin',
     chainId: 8224,
     auxpowApi: 'createauxblock',
@@ -117,10 +142,11 @@ const coins = {
     stratumPort: 3339,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 40,
     mergeMinedWith: 'litecoin',
     chainId: 50,
     auxpowApi: 'createauxblock',
+    payoutAddress: process.env.DINGO_PAYOUT_ADDRESS || '',
     daemon: {
       host: process.env.DINGO_RPC_HOST || '127.0.0.1',
       port: parseInt(process.env.DINGO_RPC_PORT) || 34646,
@@ -137,10 +163,11 @@ const coins = {
     stratumPort: 3340,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 40,
     mergeMinedWith: 'litecoin',
     chainId: 74,
     auxpowApi: 'createauxblock',
+    payoutAddress: process.env.SHIC_PAYOUT_ADDRESS || '',
     daemon: {
       host: process.env.SHIC_RPC_HOST || '127.0.0.1',
       port: parseInt(process.env.SHIC_RPC_PORT) || 33863,
@@ -157,10 +184,11 @@ const coins = {
     stratumPort: 3341,
     reward: 0,
     blockTime: 60,
-    confirmations: 2,
+    confirmations: 40,
     mergeMinedWith: 'litecoin',
     chainId: 168,
     auxpowApi: 'createauxblock',
+    payoutAddress: process.env.TRMP_PAYOUT_ADDRESS || '',
     daemon: {
       host: process.env.TRMP_RPC_HOST || '127.0.0.1',
       port: parseInt(process.env.TRMP_RPC_PORT) || 33883,

@@ -36,6 +36,38 @@ Use your wallet address as the username.
 
 Install from the Umbrel app store or add the community app store repo.
 
+## ⚠️ REQUIRED: Payout Address Setup
+
+**Before mining, you MUST configure payout addresses for merge-mined coins.**
+Without valid addresses, merge mining will silently fail and you will miss block rewards!
+
+Edit `docker-compose.yml` in your app data directory and set the payout address
+environment variables for each coin:
+
+```yaml
+environment:
+  # Set YOUR OWN addresses - these receive the mined coins!
+  JKC_PAYOUT_ADDRESS: "your_junkcoin_address_here"  # REQUIRED - no wallet in daemon
+  DOGE_PAYOUT_ADDRESS: ""   # Leave empty to auto-generate, or set your own
+  PEPE_PAYOUT_ADDRESS: ""   # Leave empty to auto-generate, or set your own
+  BELLS_PAYOUT_ADDRESS: ""  # Leave empty to auto-generate, or set your own
+  LKY_PAYOUT_ADDRESS: ""    # Leave empty to auto-generate, or set your own
+  DINGO_PAYOUT_ADDRESS: ""  # Leave empty to auto-generate, or set your own
+  SHIC_PAYOUT_ADDRESS: ""   # Leave empty to auto-generate, or set your own
+  TRMP_PAYOUT_ADDRESS: ""   # Leave empty to auto-generate, or set your own
+```
+
+**How to get addresses:**
+- For coins with wallets in the daemon (DOGE, PEPE, BELLS, LKY, DINGO, SHIC, TRMP):
+  Leave empty and the pool will auto-generate via `getnewaddress`. Or set your own wallet address.
+- For JKC: The daemon has no wallet. You must provide an address from an external Junkcoin wallet.
+
+**To verify merge mining is working**, check the backend logs for:
+```
+[MergeMining] LTC merge-mining 8 aux chains: DOGE, PEPE, BELLS, LKY, JKC, DINGO, SHIC, TRMP
+```
+If any coin is missing from this list, its payout address is invalid or not set.
+
 ## Quick Start (Standalone)
 
 ### Prerequisites

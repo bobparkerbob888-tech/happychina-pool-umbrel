@@ -48,7 +48,17 @@ services:
       JKC_RPC_PORT: '9772'
       JKC_RPC_USER: umbrel
       JKC_RPC_PASS: umbrel
-      JKC_PAYOUT_ADDRESS: '7ZcDG1N1X6TbiFmzNLxtBXvMd1Gm7sC14d'  # CHANGE THIS! JKC daemon has no wallet - set your own JKC address from your wallet
+      # ⚠️  IMPORTANT: Set YOUR OWN payout addresses below! These receive mined coins.
+      # Generate addresses from each coins wallet, or use addresses from your own wallets.
+      # Without valid addresses, merge mining will NOT work for that coin!
+      JKC_PAYOUT_ADDRESS: "CHANGE_ME"   # Junkcoin - daemon has no wallet, must provide your own address
+      DOGE_PAYOUT_ADDRESS: ""           # Dogecoin - leave empty to auto-generate from daemon wallet
+      PEPE_PAYOUT_ADDRESS: ""           # Pepecoin - leave empty to auto-generate from daemon wallet
+      BELLS_PAYOUT_ADDRESS: ""          # Bells - leave empty to auto-generate from daemon wallet
+      LKY_PAYOUT_ADDRESS: ""            # Luckycoin - leave empty to auto-generate from daemon wallet
+      DINGO_PAYOUT_ADDRESS: ""          # Dingocoin - leave empty to auto-generate from daemon wallet
+      SHIC_PAYOUT_ADDRESS: ""           # Shibacoin - leave empty to auto-generate from daemon wallet
+      TRMP_PAYOUT_ADDRESS: ""           # TrumPOW - leave empty to auto-generate from daemon wallet
       DINGO_RPC_HOST: dingocoind
       DINGO_RPC_PORT: '34646'
       DINGO_RPC_USER: umbrel
