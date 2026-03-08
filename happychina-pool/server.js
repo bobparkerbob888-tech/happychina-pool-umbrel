@@ -1260,7 +1260,7 @@ class StratumServer extends EventEmitter {
       // Actually, the merkle branches for stratum are just the sibling hashes
       // Let me recalculate properly
       merkleBranches.length = 0;
-      this.computeMerkleBranches(template.transactions.map(tx => tx.hash || tx.txid), merkleBranches);
+      this.computeMerkleBranches(template.transactions.map(tx => tx.txid || tx.hash), merkleBranches);
     }
 
     // prevhash: Yiimp ser_string_be2 format (reverse order of 4-byte groups)
