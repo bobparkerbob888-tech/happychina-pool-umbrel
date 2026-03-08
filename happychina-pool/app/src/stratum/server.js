@@ -976,7 +976,7 @@ class StratumServer extends EventEmitter {
 
       // Check merge-mined aux chains
       if (job.auxData && result.hash) {
-        this.checkAuxTargets(client, job, result, extraNonce2, nTime, nonce, versionBits);
+        if (!this._auxJobLog) { this._auxJobLog = true; console.log(`[AUX-DIAG] job.auxData present: ${!!job.auxData}, auxBlocks count: ${job.auxData?.auxBlocks?.size || 0}`); } this.checkAuxTargets(client, job, result, extraNonce2, nTime, nonce, versionBits);
       }
 
       this.sendResponse(client, id, true);
@@ -1063,9 +1063,9 @@ class StratumServer extends EventEmitter {
 
       const networkTarget = nbitsToTarget(job.nbits);
       const isBlock = hashMeetsTarget(hashReversed, networkTarget);
-      if (shareDiff > 10000000) {
-        const nTargetHex = networkTarget.toString("hex");
-        const hashHex = hashReversed.toString("hex");
+      if (shareDiff > 100000) {
+        console.log(`[HIGH-SHARE] shareDiff=${shareDiff.toFixed(0)} isBlock=${isBlock} hash=${hashReversed.toString("hex").substring(0,20)}... nTarget=${networkTarget.toString("hex").substring(0,20)}... nbits=${job.nbits}`);
+        if (isBlock) console.log(`[BLOCK-DETECT] !!!!! BLOCK FOUND !!!!! shareDiff=${shareDiff} hash=${hashReversed.toString("hex")}`);
       }
 
       return { valid: true, shareDiff, isBlock, hash: hashReversed.toString('hex') };
@@ -1146,11 +1146,25 @@ class StratumServer extends EventEmitter {
     const txCount = 1 + template.transactions.length;
     parts.push(writeVarInt(txCount));
 
-    // Full coinbase transaction (with witness data for segwit)
+    // Full coinbase transaction - MUST be the same tx used for merkle root
+    // For segwit: convert non-witness coinbase to witness format by inserting
+    // marker+flag after version and witness stack before locktime
     if (coin.segwit) {
-      const mergeCommit = job.auxData ? job.auxData.commitment : null;
-      const coinbaseTx = buildCoinbaseTx(template, blockEN1, extraNonce2, client.coin, mergeCommit);
-      parts.push(coinbaseTx);
+      // coinbaseBuffer is non-witness: [version(4)][vin...vout...][locktime(4)]
+      // witness format: [version(4)][marker(00)flag(01)][vin...vout...][witness_stack][locktime(4)]
+      const txVersion = coinbaseBuffer.slice(0, 4);
+      const txMiddle = coinbaseBuffer.slice(4, coinbaseBuffer.length - 4);
+      const txLocktime = coinbaseBuffer.slice(coinbaseBuffer.length - 4);
+      // Witness stack for coinbase: 1 item, 32 zero bytes (witness reserved value)
+      const witnessStack = Buffer.from('0120' + '00'.repeat(32), 'hex');
+      const witnessCoinbase = Buffer.concat([
+        txVersion,
+        Buffer.from([0x00, 0x01]),  // segwit marker + flag
+        txMiddle,
+        witnessStack,
+        txLocktime
+      ]);
+      parts.push(witnessCoinbase);
     } else {
       parts.push(coinbaseBuffer);
     }
@@ -1452,6 +1466,13 @@ class StratumServer extends EventEmitter {
   // Check if a share from a parent chain also solves any merge-mined aux chains
   checkAuxTargets(client, job, shareResult, extraNonce2, nTime, nonce, versionBits) {
     const hashReversed = Buffer.from(shareResult.hash, 'hex');
+    // DIAGNOSTIC - log every 500th call to prove aux checking is active
+    if (!this._auxCheckCount) this._auxCheckCount = 0;
+    this._auxCheckCount++;
+    if (this._auxCheckCount % 500 === 1) {
+      const auxCount = job.auxData?.auxBlocks?.size || 0;
+      console.log(`[AUX-DIAG] checkAuxTargets called #${this._auxCheckCount} with ${auxCount} aux chains, shareDiff=${shareResult.shareDiff?.toFixed(2)}, hash=${shareResult.hash?.substring(0,20)}...`);
+    }
 
     for (const [auxCoinId, auxBlock] of job.auxData.auxBlocks) {
       try {
